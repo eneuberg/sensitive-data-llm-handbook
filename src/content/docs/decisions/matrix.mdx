@@ -17,11 +17,11 @@ The matrix cumulates: every cell *includes* the layers from every weaker cell to
 | **Sensitive** (PII, customer data, internal financial) | + [Data transformation](../patterns/data-transformation/) (k-anonymity + pseudonymisation). ~1 week. *Residual:* composition attacks across many queries. | + Generalisation of quasi-identifiers + [DP](../patterns/differential-privacy/) on aggregates. ~2–3 weeks. *Residual:* membership inference on suppression signals. | + [Dual-LLM](../patterns/dual-llm/) for any free-text data the model reads + [model-level defences](../patterns/model-level-defenses/) when feasible. ~4–6 weeks. *Residual:* renderer-side exfiltration if not also hardened. |
 | **Highly sensitive** (health, regulated PII, legally protected) | + [DP](../patterns/differential-privacy/) on aggregates + symmetric suppression. ~3 weeks. *Residual:* trust in your own ops. | + Synthetic-data layer for exploratory queries. ~6+ weeks. *Residual:* re-identification via external joins. | LLM never sees real data. Synthetic dataset for exploration; real-data queries gated by human-in-the-loop approval workflow. ~quarters. *Residual:* operational. |
 
-The diagonal you can ship: most teams' first deployment lives in **{Sensitive × Trusted}** or **{Sensitive × Semi-trusted}**. Build the lower-right cells only when reality forces you there.
+The diagonal you can ship: most teams' first deployment lives in *Sensitive × Trusted* or *Sensitive × Semi-trusted*. Build the lower-right cells only when reality forces you there.
 
 ## How to read the cells
 
-Each cell lists the *layers added* relative to weaker cells. To get the full layer stack for, say, **{Sensitive × Semi-trusted}**, walk left and up: mediated tool surface + audit + egress filter + data transformation + generalisation + DP. That is the build list.
+Each cell lists the *layers added* relative to weaker cells. To get the full layer stack for, say, *Sensitive × Semi-trusted*, walk left and up: mediated tool surface + audit + egress filter + data transformation + generalisation + DP. That is the build list.
 
 The effort estimates assume Opus 4.7 (or comparable) is helping with implementation, not building from scratch alone. Calendar time, not engineer-days.
 
