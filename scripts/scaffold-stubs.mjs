@@ -58,17 +58,9 @@ const MANIFEST = {
   'decisions': [
     ['matrix', 'Decision matrix', 'Two axes — data sensitivity × user adversariality. Cells = recommended layer combinations + rough effort.'],
   ],
-  'implementation': [
-    ['00-overview',      'Overview',                               'How to actually build it. Code patterns, schemas, tests.'],
-    ['tool-surface',     'Tool surface & aggregation enforcement', 'The aggregate-only tool module: schema, validation order, k-min suppression, max cardinality, filter-narrowness check.'],
-    ['db-side-concerns', 'DB-side concerns',                       'Pseudonymization at the view layer, least-privilege roles, and the audit log schema.'],
-    ['egress-filter',    'Egress filter implementation',           'Denylist, density, substring-quote heuristics.'],
-    ['testing',          'Testing each layer',                     'Adversarial test corpus per defense. AgentDojo for agent-level testing.'],
-  ],
   'appendix': [
     ['glossary',         'Glossary',                              'MCP, RAG, tool calling, k-anonymity, differential privacy, ε-budget, lethal trifecta, control plane / data plane, confused deputy.'],
     ['references',       'References',                            'Inline-cited from the handbook. Grouped: foundational, defenses, attacks, standards (OWASP LLM Top 10, NIST AI 600-1, MITRE ATLAS), industry writeups.'],
-    ['tldr',             'TL;DR for the colleague conversation',  '5-bullet elevator version.'],
     ['further-reading',  'Further reading by topic',              'Curated, not a dump. ≤6 items per topic.'],
   ],
 };

@@ -31,7 +31,6 @@ export default defineConfig({
 				{ label: 'Part 3 — Architecture', autogenerate: { directory: 'architecture' }, collapsed: false },
 				{ label: 'Part 4 — Patterns', autogenerate: { directory: 'patterns' }, collapsed: true },
 				{ label: 'Part 5 — Decision Matrix', autogenerate: { directory: 'decisions' } },
-				{ label: 'Part 6 — Implementation', autogenerate: { directory: 'implementation' }, collapsed: true },
 				{ label: 'Appendix', autogenerate: { directory: 'appendix' }, collapsed: true },
 			],
 		}),
