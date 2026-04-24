@@ -1,14 +1,66 @@
 ---
 title: "Anti-patterns"
-description: "LLM-as-firewall, \"just put it in the system prompt,\" credential pass-through, untyped execute_sql, LLM-as-judge as a control."
+description: "The recurring failure modes. If your design contains one of these, fix it before shipping."
 sidebar:
   order: 15
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+A short, opinionated list of designs that look reasonable in a diagram and fail in production. Each appears in the wild often enough to deserve its own name and its own warning.
 
-LLM-as-firewall, "just put it in the system prompt," credential pass-through, untyped execute_sql, LLM-as-judge as a control.
+## "Just put it in the system prompt"
+
+**What it looks like.** *"You must never return raw rows. You must always aggregate. You must refuse questions about individuals."*
+
+**Why it fails.** The system prompt is content the model weighs against everything else in its context. Universal jailbreaks, role-play attacks, and indirect injection regularly outvote it. See [control plane vs data plane](../mental-models/02-control-data-plane/). The system prompt is a *hint*, not a security boundary.
+
+**What to do instead.** Move the constraint into [tool-implementation code](./mediated-tool-surface/), where it cannot be argued with.
+
+## LLM-as-firewall
+
+**What it looks like.** A second LLM call inspects the user's prompt and decides whether to forward it to the main model. Or: a second LLM call inspects the main model's *response* and decides whether to release it.
+
+**Why it fails.** Both LLMs share failure modes. An attack that bypasses one's training will, in expectation, bypass the other's. You're stacking probabilistic filters with correlated errors. See the [LLM-as-judge corollary](../mental-models/04-capability-over-intent/).
+
+**What to do instead.** Deterministic code. The [egress filter](./egress-filtering/) is what an LLM-as-firewall *thinks* it is — except it actually works.
+
+## Untyped `execute_sql` "for flexibility"
+
+**What it looks like.** A tool that accepts a SQL string. A tool that accepts a "JSON query language" that compiles to arbitrary SQL. A tool with `filters: string` that gets pasted into a `WHERE` clause.
+
+**Why it fails.** Any free-form query language gives the model the full expressive power of the database. K-min suppression in a wrapper does not help once the model can write its own queries. This is the most common single mistake.
+
+**What to do instead.** Allow-list the operations *and* the columns *and* the filter operators. If a question can't be answered, the system declines. Flexibility comes from adding new tools, not from one general-purpose tool.
+
+## Credential pass-through to the agent
+
+**What it looks like.** The user's OAuth token is forwarded to the agent so the agent can "act on the user's behalf" against downstream services.
+
+**Why it fails.** The agent's blast radius becomes the user's full authority across every connected service. Indirect injection now means an attacker can make the agent do anything the user could do, including things outside the agent's intended scope. See the [agent-as-perimeter anti-pattern](../mental-models/04-capability-over-intent/).
+
+**What to do instead.** The agent holds its own narrowly-scoped credentials. The intersection of the user's authority and the agent's tools defines the actual operations possible.
+
+## "We sanitise the input"
+
+**What it looks like.** Input filters that strip or escape "suspicious" patterns from the user's prompt before sending it to the model.
+
+**Why it fails.** Sanitisation worked for SQL because the grammar of SQL is fixed and the dangerous tokens are enumerable. Natural-language injection has no grammar and no fixed token set. You cannot write a regex for "the user is trying to manipulate the model." Even successful sanitisation does nothing about indirect injection from data the model retrieves.
+
+**What to do instead.** Constrain *what the model can do with* any input, not what the input is allowed to contain. This is the difference between input validation and authorisation.
+
+## "The model said it wouldn't do that"
+
+**What it looks like.** A test plan that consists of asking the model adversarial questions and recording its refusals.
+
+**Why it fails.** The model's refusal in your test environment generalises to nothing. Different prompts, different framings, different roles, different times of day — refusal training is a soft bias, not a control. Also: refusal is the model's response to *your* attack. The actual attacker will phrase it differently.
+
+**What to do instead.** Test the *capabilities*. Can the model emit a tool call that returns a row? Then it doesn't matter whether it currently chooses to. Fix the capability.
+
+## Mixing audit logs into the LLM context
+
+**What it looks like.** *"Use the recent query history to give the model better context."*
+
+**Why it fails.** Audit logs contain every previous user's queries and answers. Putting them in the model context means a current user can extract previous users' activity. The trifecta is back together — private data (the log), untrusted input (the new user's prompt), exfiltration channel (the response).
+
+**What to do instead.** Audit logs are for human investigators and offline analysis only. Never reach into them from a live LLM context.

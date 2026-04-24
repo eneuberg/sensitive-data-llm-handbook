@@ -1,14 +1,56 @@
 ---
 title: "Egress filtering"
-description: "Deterministic post-processing on model output: denylist scan, numeric density, quoted-substring length."
+description: "Deterministic post-processing on the model's response: denylist, density, quoted-substring length. Coarse net, cheap, high marginal value."
 sidebar:
   order: 8
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+The egress filter runs on the LLM's outgoing response, before the user (or the caller) sees it. It catches what slipped through the upstream layers — usually because the model was induced to quote, restate, or encode data it received legitimately as part of a tool result.
 
-Deterministic post-processing on model output: denylist scan, numeric density, quoted-substring length.
+It is a *coarse net*, not a precision instrument. Cheap to add, runs in microseconds, has no shared failure mode with the LLM. It does not stop a determined attacker who can extract data one paraphrase at a time. It does stop bulk leakage and the obvious cases.
+
+## Three checks worth implementing
+
+### Denylist scan
+
+A list of known-sensitive strings or patterns: raw IDs from your directory, full names from an internal staff list, internal codenames, regex for SSN/credit-card shapes, the literal string `"BEGIN RSA PRIVATE KEY"`. Block any response containing a match.
+
+### Numeric / character density
+
+A response to *"summarise the trend"* should not contain 400 numbers. A response to *"explain the policy"* should not contain a 5-KB base64 blob. Compute simple ratios — digits per character, base64-shaped runs, comma-separated number sequences — and reject responses whose density is wildly inconsistent with the request type.
+
+### Quoted-substring length
+
+Cap the longest contiguous substring the model is allowed to quote from any returned tool result. If a tool returned a row payload of 800 characters and the model's response includes 600 of them verbatim, that is data exfiltration with extra steps. Reject or truncate.
+
+## Code sketch
+
+```ts
+function egressFilter(response: string, toolResults: string[], questionType: string) {
+  if (matchesDenylist(response, DENYLIST))                           return reject("denylist");
+  if (numericDensity(response) > MAX_DENSITY[questionType])          return reject("numeric density");
+  if (longestSharedSubstring(response, toolResults) > MAX_QUOTE_LEN) return reject("quoted-substring");
+  return accept(response);
+}
+```
+
+A rejected response is replaced with a generic *"That response was blocked by the safety filter"* and logged for review.
+
+## Common mistakes
+
+- **Implementing the filter using an LLM.** This is the [LLM-as-judge anti-pattern](../mental-models/04-capability-over-intent/) — shared failure modes with the generating model. Use deterministic code.
+- **Filtering only the user-visible reply.** If the model can also emit "thinking" / "reasoning" channels, those reach the user too in many UIs. Filter both.
+- **Denylist-only.** A denylist that doesn't include a name still leaks that name. The density and quoted-substring checks are the catch-all; the denylist catches the targeted cases.
+
+## Decision: when to use this
+
+- **Always.** Cost is near-zero, value is non-trivial.
+- **Tune the thresholds per question type.** A "show me the data table" question legitimately produces high numeric density; a free-text chat question does not.
+- **Couple with** the [audit log](./audit-anomaly/) — every block becomes evidence about attacker behaviour.
+
+## See also
+
+- [Markdown & image exfiltration](../../threats/markdown-exfiltration/) — the threat the egress filter most directly counters.
+- [Egress filter implementation](../../implementation/egress-filter/) — concrete code patterns.

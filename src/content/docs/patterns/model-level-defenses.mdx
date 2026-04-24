@@ -1,14 +1,48 @@
 ---
-title: "Ausblick: model-level defenses"
-description: "Research-grade defenses worth knowing about: CaMeL (capability mediation of data flow), StruQ (structured-query training), SecAlign (preference-optimized defense)."
+title: "Ausblick: model-level defences"
+description: "Three research-grade techniques worth knowing: CaMeL (capability mediation of data flow), StruQ (structured-query training), SecAlign (preference-optimised defence)."
 sidebar:
-  order: 8
+  order: 11
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+Three research lines from 2024–2025 that approach prompt injection from a different angle than the capability-and-data patterns elsewhere in this handbook. None of them is yet a drop-in production technique. All of them are worth a security engineer's attention because they extend the design space.
 
-Research-grade defenses worth knowing about: CaMeL (capability mediation of data flow), StruQ (structured-query training), SecAlign (preference-optimized defense).
+This page is short on purpose. *What*, *why relevant*, *why good* — enough to make a one-meeting case for each.
+
+## CaMeL — capability mediation of data flow
+
+**What.** A protective system layer wrapped around an LLM agent. The user's prompt is parsed by a *trusted* P-LLM (privileged) into an explicit control-and-data-flow plan. Untrusted data retrieved during execution is handled by a *quarantined* Q-LLM that has no tools. A deterministic interpreter enforces capability-based policies at every tool call: if a capability for a given data flow was not granted by the original query, the call is refused. Generalises and formalises the [dual-LLM pattern](./dual-llm/).
+
+**Why relevant.** It is the first widely-cited defence against prompt injection that gives you a *provable* security property — under stated assumptions, untrusted data cannot influence control flow.
+
+**Why good.** Solves 77% of AgentDojo tasks with provable security, against 84% for an undefended baseline — i.e., near-baseline utility with a real, formal guarantee. Open source. Compatible with multiple underlying LLMs.
+
+**Reference.** Debenedetti et al., 2025. [arXiv:2503.18813](https://arxiv.org/abs/2503.18813). Code at `github.com/google-research/camel-prompt-injection`.
+
+## StruQ — structured queries
+
+**What.** A train-time defence. A secure front-end formats the prompt and any user data into two distinct channels via special tokens. A specially fine-tuned LLM is trained to follow instructions only from the prompt channel, ignoring instructions in the data channel. The structural separation ([control plane vs data plane](../mental-models/02-control-data-plane/)) is taught to the model rather than imposed at runtime.
+
+**Why relevant.** It is the cleanest empirical demonstration that the data-vs-instructions distinction can be made structural in a single model, rather than relying on prompt-engineering tricks like spotlighting.
+
+**Why good.** Significantly raises injection robustness with little to no measurable utility loss, on top of a base model. Approach generalises across model sizes; the technique itself is reproducible.
+
+**Reference.** Chen et al., 2024. [arXiv:2402.06363](https://arxiv.org/abs/2402.06363).
+
+## SecAlign — preference-optimised defence
+
+**What.** Construct a preference dataset of (injection input, secure output, insecure output) triples and apply preference optimisation (DPO-style) to the base model. The model learns to prefer the secure response — following the original instruction — over the insecure one (following the injected instruction).
+
+**Why relevant.** The first method to drive injection success rates *below 10%* with broad generalisation, including against attacks much more sophisticated than those seen during training.
+
+**Why good.** Compatible with any model that supports fine-tuning. The follow-up *Meta SecAlign* release (Chen et al., 2025, [arXiv:2507.02735](https://arxiv.org/abs/2507.02735)) provides 8B and 70B fully open-source models with the defence already trained in — usable today as a drop-in for an open-weight deployment.
+
+**Reference.** Chen et al., 2024. [arXiv:2410.05451](https://arxiv.org/abs/2410.05451).
+
+## Decision: when to use these
+
+- **Today, in production:** none of these *replaces* the architectural controls in the rest of this handbook. CaMeL is the closest to ready; the others are model-level and tied to specific weights.
+- **Worth piloting** when (a) you have an open-weight deployment (Meta SecAlign as a base model), (b) you have a hard indirect-injection surface that capability constraints cannot fully address, or (c) you need to make a defensible "we tried the state of the art" claim to a security review.
+- **Track over the next 12 months.** This is the area of LLM security with the fastest-moving research and the best-funded labs. The patterns here will look different by the next revision of this handbook.

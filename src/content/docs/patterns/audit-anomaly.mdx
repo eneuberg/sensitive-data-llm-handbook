@@ -1,14 +1,69 @@
 ---
 title: "Audit log + anomaly detection"
-description: "Log every tool call with user, args, result, budget. Cheap; load-bearing for incident response."
+description: "Log every tool call, every response, every budget consumption. Cheap; load-bearing for incident response."
 sidebar:
   order: 14
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+Logs are not a real-time control. They cannot stop an attack in flight. What they do — and what nothing else does — is let you *find out what happened* after the fact, attribute it to a user, and tell an auditor with confidence what data was or was not exposed.
 
-Log every tool call with user, args, result, budget. Cheap; load-bearing for incident response.
+This is the pattern that decides whether an incident is a five-minute investigation or a multi-week reconstruction. It is also the cheapest layer in the whole architecture.
+
+## What to log
+
+Per tool call:
+
+- `user_id` (the human user, not the API key)
+- `session_id`
+- `timestamp`
+- `tool_name`, `arguments`
+- `result` (the tool's return value — truncated if huge, but the *shape* preserved)
+- `budget_consumed` (raw query count, plus any DP epsilon spend)
+
+Per model response:
+
+- `pre_egress_response` (what the model emitted)
+- `post_egress_response` (what the user saw)
+- `egress_decision` (pass / blocked / truncated, with reason)
+
+Per session:
+
+- `running_budget_total`
+- `running_query_count`
+- `flagged_anomalies` (with reasons, see below)
+
+## What to alert on (anomaly detection)
+
+Two patterns deserve real-time alerts; the rest belong in a daily report.
+
+**Real-time alerts.**
+- Repeated egress-filter blocks from the same user within a short window. The user is probing.
+- Budget exhaustion within an unusually short time. Either bug or attack.
+
+**Daily-report patterns.**
+- High volume of narrow-filter queries from one user (the [reconstruction-via-narrow-queries](../../threats/reconstruction-and-narrow-queries/) shape).
+- Many near-duplicate queries with small filter perturbations.
+- Cross-session correlation — the same query patterns from a single human user across multiple "fresh" sessions or API keys.
+
+The exact thresholds are tuned by use case. The *presence* of these checks is what matters; the precision improves over time as you see real traffic.
+
+## Retention as its own design problem
+
+The audit log is itself sensitive data. It contains every question every user asked and every result they got — often more revealing than the underlying database. Treat it accordingly:
+
+- Encrypt at rest. Restrict access to a small named group.
+- Set a retention policy — long enough to support investigations and audits, short enough not to become its own breach risk. 90 days to 1 year is a common range; regulated industries may dictate otherwise.
+- *Do not* feed the audit log to an LLM as a debugging aid. That puts the trifecta back together.
+
+## Decision: when to use this
+
+- **Always, from day one.** This is the cheapest pattern with the highest "ability to respond to an incident" payoff.
+- **Skip nothing.** Logging less than the full set above means a future investigator can't answer the question that matters.
+- **Alerting can be added incrementally** — start with logging, layer alerts on once you understand normal traffic.
+
+## See also
+
+- [Implementation: audit log schema](../../implementation/db-side-concerns/) — concrete schema and retention recipe.
+- [Reconstruction & narrow queries](../../threats/reconstruction-and-narrow-queries/) — the threat the anomaly checks most directly look for.

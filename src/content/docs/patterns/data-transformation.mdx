@@ -1,14 +1,57 @@
 ---
 title: "Data transformation patterns"
-description: "k-anonymity suppression, pseudonymization, quasi-identifier generalization, synthetic-data substitution. The pre-LLM data layer."
+description: "k-anonymity suppression, pseudonymisation, quasi-identifier generalisation, synthetic-data substitution. The pre-LLM data layer."
 sidebar:
   order: 3
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+Four patterns that operate on the data before it ever reaches the LLM. They are decided together at the same architectural moment — the design of the database views and tool implementations the model will see.
 
-k-anonymity suppression, pseudonymization, quasi-identifier generalization, synthetic-data substitution. The pre-LLM data layer.
+The principle: **whatever the LLM cannot see cannot be extracted, regardless of any prompt-level attack.** Each pattern below removes a category of information from the LLM's view of the world.
+
+## k-anonymity suppression
+
+Any aggregate over a group smaller than *k* returns `"suppressed"` instead of the value. Standard *k* values: 5 (light protection, e.g. internal analytics), 10–25 (sensitive data), 50+ (regulatory contexts).
+
+This is the architectural answer to the [singleton-aggregate attack](../mental-models/05-reconstruction-principle/). Without k-min, every aggregate API is a row-read API in disguise — narrow the filter enough and the average becomes the value.
+
+Enforced inside [the tool implementation](./mediated-tool-surface/), not in the prompt. Apply per-bucket on groupbys, not per-result.
+
+## Pseudonymisation at the view layer
+
+Replace direct identifiers (names, emails, SSNs, customer IDs) with stable tokens *before anything reaches the LLM*. The model reasons about `Patient_8af3` and never knows who that is. Re-identification happens at render time, in the chat UI, for users authorised to see the mapping — entirely outside the LLM's reach.
+
+Two non-negotiables:
+
+- **Done in the database view, not in application code.** Application-level pseudonymisation requires trusting the model's tool calls to apply it correctly. View-level pseudonymisation is enforced by the schema; the model literally cannot ask for raw names.
+- **Stable tokens.** Same input maps to same token across sessions. Otherwise legitimate analytical workflows ("the patient I asked about yesterday") break.
+
+## Quasi-identifier generalisation
+
+Direct identifiers are obvious. Quasi-identifiers are not — they are columns whose *combination* identifies an individual even though no single column does. Zip + age + sex was famously enough to identify >80% of US individuals in the Sweeney 2000 study.
+
+Generalise them: zip → zip3 (first three digits), age → decade, exact dates → month, free-text job titles → category. The LLM still gets useful information; the resolution at which any row can be uniquely picked out is degraded by orders of magnitude.
+
+The cost is fidelity. Each generalisation decision is per-column; you trade what the LLM can compute against how easily a row can be re-identified.
+
+## Synthetic-data substitution
+
+For *exploratory* and *analytical* questions, point the LLM at a synthetic dataset that preserves marginal distributions and correlations but contains no real records. The LLM's answers about "trends in diabetes patients" remain meaningful; no real patient is ever exposed to the model.
+
+For real-data answers, route through the [mediated aggregate path](./mediated-tool-surface/). This is a hybrid pattern, not a replacement: synthetic data for shape, real aggregates for numbers.
+
+The hard part is generation quality. CTGAN, TVAE, and similar generators get marginal distributions right but often miss subtler correlations. Validate by running the same analytical queries against synthetic and real data and comparing the answers.
+
+## Decision: when to use which
+
+- **k-anonymity suppression:** always.
+- **Pseudonymisation:** whenever the model could possibly see a row, even via `sample()` or error messages. Cheap; do it.
+- **Generalisation:** when quasi-identifier risk is non-trivial — health, location, employment data.
+- **Synthetic data:** when users need exploratory access to *shape* without any real-row exposure. Significant up-front cost; worth it for adversarial-user / highly-sensitive cells of the [decision matrix](../decisions/matrix/).
+
+## See also
+
+- [The reconstruction principle](../mental-models/05-reconstruction-principle/) — why k-min exists.
+- [DB-side concerns](../../implementation/db-side-concerns/) — where pseudonymisation actually lives in code.

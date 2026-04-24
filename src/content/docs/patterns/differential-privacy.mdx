@@ -1,14 +1,50 @@
 ---
 title: "Differential privacy on aggregates"
-description: "Calibrated noise + per-user ε budget. Mature libs: OpenDP, Tumult, Google DP."
+description: "Calibrated noise plus a per-user privacy budget. The only mathematical answer to reconstruction at scale."
 sidebar:
   order: 7
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+Differential privacy (DP) is the formal framework for releasing statistics about a dataset such that the presence or absence of any single record cannot be inferred from the released statistics. It is the only known *mathematical* defence against the [reconstruction attack](../mental-models/05-reconstruction-principle/) at scale.
 
-Calibrated noise + per-user ε budget. Mature libs: OpenDP, Tumult, Google DP.
+## What it does, mechanically
+
+For every numeric answer the system would normally return, add calibrated random noise drawn from a known distribution — typically Laplace (for ε-DP) or Gaussian (for (ε, δ)-DP). The amount of noise scales with the *sensitivity* of the query (how much one record can change the answer) and with a chosen privacy parameter ε. Smaller ε ⇒ more noise ⇒ stronger guarantee.
+
+Each query consumes some of a per-user **privacy budget**. When the budget is exhausted, the session refuses further queries. Composability theorems (sequential, advanced, RDP) tell you how the loss accumulates across many queries.
+
+## Why this is the *only* answer at scale
+
+K-min suppression handles the singleton case. It does not handle the case where an attacker issues thousands of legal, above-k queries and solves the resulting linear system to recover individual rows. Dinur and Nissim (2003) proved this is unavoidable without noise scaling appropriately to the query volume — bounded noise alone is insufficient. DP exists precisely to give you a defensible answer to *"how many queries can a user issue before reconstruction becomes possible?"*
+
+For internal tools with a handful of trusted analysts, the answer in practice is *"more than they will ever issue, and we'll catch it in the audit log first."* For external researchers or genuinely adversarial users, the answer needs to be principled, and DP is the only framework that gives you one.
+
+## Libraries — do not roll your own
+
+Mature, audited DP implementations:
+
+- **OpenDP** (`opendp.org`) — Harvard / Microsoft. Reference quality, conservative.
+- **Tumult Analytics** (`tmlt.io/analytics`) — production-oriented, SQL-like API.
+- **Google's `differential-privacy`** (`github.com/google/differential-privacy`) — bindings in Go, C++, Java; battle-tested in Google products.
+
+Implementing DP yourself is a research-grade undertaking that has gone wrong for serious teams. The libraries above handle composability, parallel composition, and the subtleties of noise calibration that determine whether your guarantees actually hold.
+
+## Common mistakes
+
+- **Per-query budgets that reset on a new session.** A user who can open a new session at zero cost has no budget at all. Track per identity, not per session.
+- **Per-API-key budgets when API keys are cheap.** Same problem.
+- **DP applied to the model's output instead of the tool's output.** The model is non-deterministic and DP is a guarantee about a deterministic mechanism. Apply noise inside the aggregation tool, then let the model report the noisy result.
+- **DP without k-min.** DP makes the result less useful for reconstruction, but a singleton aggregate before noise is still much closer to the true value than DP guarantees. Compose them.
+
+## Decision: when to use this
+
+- **Skip if** the user base is small, trusted, and the audit log is monitored.
+- **Required if** users are external, semi-trusted, or unmonitored; if data is genuinely sensitive (health, financial, regulated PII); or if "how do you defend against reconstruction?" is a question your auditors will ask.
+- **Treat as a complement to** k-min suppression and audit logging, not a replacement.
+
+## See also
+
+- [The reconstruction principle](../mental-models/05-reconstruction-principle/) — the underlying result that motivates DP.
+- [Decision matrix](../decisions/matrix/) — when DP graduates from "nice to have" to "load-bearing."

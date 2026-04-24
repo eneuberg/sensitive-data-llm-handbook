@@ -1,14 +1,33 @@
 ---
 title: "Overview"
-description: "Each pattern: what it is, when to use, when not to, code sketch when it clarifies."
+description: "The patterns of the reference architecture, organised by what they do."
 sidebar:
   order: 1
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+The patterns are the reusable building blocks of the [reference architecture](../../architecture/00-trust-boundaries/). They are organised here by what they constrain, not by which layer they sit in.
 
-Each pattern: what it is, when to use, when not to, code sketch when it clarifies.
+**Capability constraint** — what the model can do.
+- [Mediated tool surface](./mediated-tool-surface/) — the load-bearing one.
+
+**Data shape** — what the model can see.
+- [Data transformation patterns](./data-transformation/) — k-anonymity, pseudonymisation, generalisation, synthetic data.
+- [Differential privacy on aggregates](./differential-privacy/) — the only mathematical answer to reconstruction at scale.
+
+**Output shape** — what the model can return.
+- [Egress filtering](./egress-filtering/) — deterministic post-processing on the LLM's response.
+
+**Plane separation** — keeping instructions and data apart.
+- [Spotlighting](./spotlighting/) — prompt-engineering technique, partial defence.
+- [Dual-LLM pattern](./dual-llm/) — privileged model never sees untrusted content.
+- [Ausblick: model-level defences](./model-level-defenses/) — research-grade techniques (CaMeL, StruQ, SecAlign).
+
+**Operations** — what you do continuously, not at design time.
+- [Audit log + anomaly detection](./audit-anomaly/) — load-bearing for incident response.
+
+**Things not to do.**
+- [Anti-patterns](./anti-patterns/) — the failure modes to recognise in your own designs.
+
+Each page ends with a *Decision* block — a three-line answer to "should I use this here?" Skim those if you're choosing patterns under time pressure.

@@ -1,14 +1,32 @@
 ---
-title: "Spotlighting (Ausblick)"
-description: "Encoding/marking untrusted data so the model can distinguish it from instructions. Cheap, partial defense."
+title: "Spotlighting"
+description: "Marking untrusted spans in the prompt so the model can distinguish data from instructions. Cheap, partial defence."
 sidebar:
   order: 9
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+Spotlighting is a family of prompt-engineering techniques introduced by Hines et al. (Microsoft, 2024)[^sp]. The premise: the LLM cannot structurally distinguish instructions from data ([control plane vs data plane](../mental-models/02-control-data-plane/)) — but you can make the distinction *visible* via formatting, marking, or transformation, and rely on the model's training to weight that signal.
 
-Encoding/marking untrusted data so the model can distinguish it from instructions. Cheap, partial defense.
+## The three variants
+
+- **Delimiting.** Wrap untrusted spans in markers — XML-like tags, fenced code blocks, custom tokens — and instruct the model to treat content inside as data only. Easiest to implement, weakest of the three (an injection can simply close the marker).
+- **Datamarking.** Replace every space inside untrusted text with an unusual but consistent marker (e.g. `^`). The model is reminded throughout the span that it is reading marked content. Stronger than delimiting because the marker survives within the text.
+- **Encoding.** Encode untrusted text (base64, ROT13) before placing it in the prompt; instruct the model to decode-and-process. Strongest of the three; the cost is that the model has to understand the encoding well enough to operate on the content.
+
+The original paper reports attack-success-rate reductions from over 50% to under 2% on GPT-family models with the encoding variant, with minimal impact on legitimate-task performance.
+
+## Why it's an Ausblick
+
+Spotlighting is a partial, prompt-engineering defence. It does not change [capability](../mental-models/04-capability-over-intent/); the model can still be jailbroken and can still emit any tool call its surface allows. What it does is reduce the *frequency* of successful indirect injection — useful when you cannot change the model and cannot eliminate untrusted-data exposure.
+
+It is worth knowing about because (a) it is genuinely cheap to add, (b) the result is measurable, and (c) it composes well with capability constraints. Use it as a probability-shifter on top of structural defences, not in place of them.
+
+## Decision: when to use this
+
+- **Worth trying if** you have a known indirect-injection surface (RAG documents, retrieved emails, free-text DB fields) and want to reduce the rate at which the model gets confused.
+- **Skip if** you have already eliminated the exfiltration channel via [mediation](./mediated-tool-surface/) — the additional value is marginal.
+- **Combine with** datamarking on free-text fields you must show the model.
+
+[^sp]: Hines, K., et al. (2024). *Defending Against Indirect Prompt Injection Attacks With Spotlighting*. [arXiv:2403.14720](https://arxiv.org/abs/2403.14720).

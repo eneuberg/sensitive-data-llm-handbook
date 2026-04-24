@@ -1,14 +1,52 @@
 ---
-title: "Dual-LLM pattern (Ausblick)"
-description: "Privileged LLM never sees untrusted content; quarantined LLM does, but has no tools."
+title: "Dual-LLM pattern"
+description: "Privileged LLM never sees untrusted content. Quarantined LLM does, but has no tools."
 sidebar:
   order: 10
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+Coined by Simon Willison, the dual-LLM pattern is a structural answer to indirect injection: separate the model that *can act* from the model that *reads untrusted data*, and never let those two roles be the same model in the same call.
 
-Privileged LLM never sees untrusted content; quarantined LLM does, but has no tools.
+## Shape
+
+```
+                     ┌─ Privileged LLM ─┐
+   user prompt  ───► │ (has tools)       │ ───► tool calls / final answer
+                     │ (sees no docs)    │
+                     └────────┬──────────┘
+                              │ symbol references only
+                              ▼
+                     ┌─ Quarantined LLM ─┐
+                     │ (no tools)        │ ◄─── retrieved untrusted content
+                     │ (returns symbols) │
+                     └───────────────────┘
+```
+
+The privileged LLM (P-LLM) sees the user's prompt, has access to your tools, and orchestrates the system. It never sees the contents of untrusted documents.
+
+The quarantined LLM (Q-LLM) is given untrusted documents and asked to extract specific information from them — *"find the order ID in this email"*, *"summarise the patient note"*. It has **no tools at all** and cannot affect the system. It returns a *symbolic handle* (e.g. `$ORDER_ID_42`) that the P-LLM then uses in its tool calls.
+
+## Why this works
+
+A prompt injection in the document the Q-LLM is reading can hijack the Q-LLM completely — it does not matter, because the Q-LLM has no tools and its output is structurally constrained to fit a schema. The injection's reach is limited to confusing the Q-LLM about which substring is the order ID, which is a much smaller problem than the P-LLM acting on attacker instructions.
+
+The P-LLM never sees the attacker's text. It sees `$ORDER_ID_42` and operates on that opaque reference.
+
+## Trade-offs
+
+- **Doubled inference cost.** Two model calls per document.
+- **Composition complexity.** Hard to use when the question requires the privileged context (the user's prompt, the tool results) to be present alongside the document content.
+- **Symbol-table management.** The host application has to maintain the mapping from symbols to actual content and resolve them only at the trusted boundary.
+
+## Decision: when to use this
+
+- **Worth it when** your system reads untrusted data of meaningful size (full emails, full documents, full web pages) and the structured-extraction pattern fits — there are obvious specific fields you need.
+- **Skip if** the user's question requires general reasoning *over* the untrusted content rather than extraction *from* it. Spotlighting is cheaper for the general case.
+- **Pair with** capability constraints on the P-LLM. Dual-LLM does not relax the need for a mediated tool surface.
+
+## See also
+
+- [Direct vs indirect injection](../mental-models/09-direct-vs-indirect/) — the threat dual-LLM most directly addresses.
+- [Ausblick: model-level defences](./model-level-defenses/) — the CaMeL system generalises this pattern with formal capability semantics.

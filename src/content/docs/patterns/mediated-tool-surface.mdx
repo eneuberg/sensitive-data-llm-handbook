@@ -1,14 +1,60 @@
 ---
 title: "Mediated tool surface (aggregate-only)"
-description: "Highest-leverage single decision. No execute_sql, no get_row. Composable aggregates only."
+description: "The single highest-leverage architectural decision. No execute_sql. No get_row. Composable aggregates only."
 sidebar:
   order: 2
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+The mediation layer is the architectural decision that decides whether everything else matters. If your tool surface includes anything resembling `execute_sql(query: string)` or `get_row(id)`, no amount of downstream layering will save you. If it is restricted to a small set of composable aggregates, almost every other defence becomes optional.
 
-Highest-leverage single decision. No execute_sql, no get_row. Composable aggregates only.
+This is the load-bearing pattern. Build it first. Get it right. Treat it as the public API of your system.
+
+## The starter tool set
+
+```
+schema_describe()                          → column names, types, descriptions only
+aggregate(metric, groupby?, filters?)      → workhorse aggregation; k-min enforced
+distribution(column, bins?, filters?)      → histograms; k-min enforced per bucket
+topk(column, n, filters?)                  → top-N categories; k-min enforced
+```
+
+That is the entire surface. Note what is missing: no `query`, no `select`, no `get_record`, no `list_*`, no `sample`. If a question cannot be answered with those four primitives, the system declines.
+
+## Why the constraint is at the *implementation*, not the description
+
+A tool's safety is exactly what its implementation does, regardless of the natural-language description in its schema. `safe_query(sql: string)` named that way is identically as dangerous as `execute_sql(sql: string)`. The model does not honour names; only humans do.
+
+Constraints to enforce inside the implementation:
+
+```ts
+function aggregate(metric, groupby, filters) {
+  const rows = applyAllowListedFilters(db, filters);   // reject unknown columns
+  if (groupby && cardinality(rows, groupby) > MAX) throw "cardinality";
+  for (const bucket of groups(rows, groupby)) {
+    if (bucket.size < K_MIN) yield { value: "suppressed", reason: `n=${bucket.size}<${K_MIN}` };
+    else                     yield { value: compute(metric, bucket) };
+  }
+}
+```
+
+The model can call this all day. The worst it can extract is what `aggregate` is willing to return — by construction, never an individual.
+
+## Common implementation mistakes
+
+- **Free-form filters.** A `filters` parameter that accepts a string of SQL fragments, or arbitrarily nested boolean logic without limits, lets the attacker bypass k-min by constructing a filter that matches exactly one row. Allow-list both the columns and the operators.
+- **k-min on the *output* but not the *intermediate*.** A groupby that aggregates 47 rows into 5 buckets of size {30, 10, 5, 1, 1} should suppress the size-1 buckets, not just check that the total is above k.
+- **Sample-mode "for debugging."** A `sample(n=3)` tool is a row-read tool. If exposed at all, it must return synthetic or heavily redacted rows.
+- **Trusting the description.** The tool's docstring says "returns aggregates only." Then the implementation calls `db.execute(...)` with model-controlled arguments. The model owns the actual behaviour.
+
+## Decision: when to use this
+
+- **Always.** This is the single non-negotiable pattern.
+- **Skip only if** the data is genuinely public, in which case you don't have a sensitive-database problem at all.
+- **Companion controls:** k-min suppression and max-cardinality live inside this layer's implementation; pseudonymisation lives at the [view layer](./data-transformation/) below it.
+
+## See also
+
+- [Capability over intent](../mental-models/04-capability-over-intent/) — the principle this pattern operationalises.
+- [The attack path](../../architecture/02-attack-path/) — shows two attacks dying at this layer.
