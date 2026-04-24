@@ -1,14 +1,39 @@
 ---
 title: "Reconstruction & narrow queries"
-description: "Filter-down-to-one and many-small-queries patterns. Defeated by k-min suppression and a privacy budget."
+description: "Filter-down-to-one and many-small-queries patterns. The two most important data-extraction attacks against aggregate-only systems."
 sidebar:
   order: 7
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+The two attack shapes every aggregate-only system has to address. Both rely on the fact that a system that returns aggregates can be coaxed into revealing individuals.
 
-Filter-down-to-one and many-small-queries patterns. Defeated by k-min suppression and a privacy budget.
+## Singleton aggregate (filter to one)
+
+**What it is.** Filter the aggregate query so narrowly that the underlying group contains exactly one record. The aggregate becomes a row read.
+
+**How it works.** *"What's the average age of patients in zip 10001 admitted on 2026-03-14 with a Type 2 Diabetes diagnosis and a renal complication code?"* — if exactly one patient matches, `AVG(age)` is that patient's age. The query is a perfectly legitimate aggregate; the answer is a row.
+
+A more devious variant: filter the *group* in a groupby narrowly while keeping the *outer* query wide. A `groupby` with 47 returned buckets that includes one bucket of size 1 leaks the individual unless k-min is applied per bucket.
+
+**Where it dies.** [k-anonymity suppression](../patterns/data-transformation/) at the [aggregation enforcement layer](../architecture/03-layer-reference/). The tool returns `"suppressed"` for any aggregate over a group below `k_min`. Critically, k-min must be applied per bucket, not just per result. Walked through in detail in the [attack path](../architecture/02-attack-path/).
+
+## Many narrow queries (composition / linear-algebra reconstruction)
+
+**What it is.** Issue many *legal* queries (each above k_min) whose filter combinations form a system of equations. Solve the system for individual rows.
+
+**How it works.** Asking for `AVG(age) GROUP BY department` 100 times with different filter combinations gives 100 linear equations over the underlying ages. Even with noise, enough queries reconstruct the data. This is the empirical content of the Dinur-Nissim 2003 result: *bounded* noise on each query is insufficient.
+
+**Where it dies.**
+
+- **For trusted users:** [audit logging](../patterns/audit-anomaly/) plus anomaly detection on query patterns catches the behaviour pattern long before reconstruction is possible. The legitimate use case rarely involves thousands of narrow filter combinations.
+- **For adversarial users:** [differential privacy](../patterns/differential-privacy/) is the only mathematical answer. A per-user privacy budget with composability tracking bounds the cumulative information released regardless of query volume. K-min alone is insufficient.
+
+**Companion controls.** Per-user query rate limits (raw and budget-weighted) raise the cost of issuing the query volume needed; cross-session correlation in the audit log prevents budget reset by opening a new session.
+
+## See also
+
+- [The reconstruction principle](../mental-models/05-reconstruction-principle/) — the underlying mathematical result.
+- [Differential privacy on aggregates](../patterns/differential-privacy/) — when the threat is real enough to need DP.
+- [Audit log + anomaly detection](../patterns/audit-anomaly/) — what catches this attack pattern in practice.

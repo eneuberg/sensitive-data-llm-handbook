@@ -1,14 +1,26 @@
 ---
 title: "Membership inference"
-description: "\"Is record X in the data?\" inferred from aggregate behavior."
+description: "Inferring whether a specific record is present in the dataset, from aggregate behaviour."
 sidebar:
   order: 9
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+**What it is.** The attacker doesn't need to recover an individual record. They only need to determine whether a *known* record (e.g. a person they suspect is in the dataset) is *in* the dataset. This is often more sensitive than the data itself — knowing that someone is in the "patients with HIV" table is the leak, regardless of what other fields are about them.
 
-"Is record X in the data?" inferred from aggregate behavior.
+**How it works.** Three common channels:
+
+- **Aggregate sensitivity.** Issue an aggregate query with and without a filter that uniquely identifies the candidate record. If the aggregate changes by exactly the contribution one row would make, the record is present.
+- **Distinctness leaks.** A `topk` query returns N items; if a candidate value is in or near the cutoff, its frequency is bounded by what the cutoff implies.
+- **Suppression signals.** k-min suppression that returns `"suppressed"` reveals that the group exists but is small. Smaller-than-k can itself be informative — knowing that "exactly 3 patients match this filter" is more than zero-knowledge.
+
+**Where it dies.**
+
+- **For aggregate sensitivity:** [differential privacy](../patterns/differential-privacy/). DP is specifically designed so that the presence or absence of any single record cannot be reliably inferred from released aggregates.
+- **For suppression signals:** suppress symmetrically. Return `"suppressed"` not just when the group is below k but also when it is above some upper bound (or when revealing the count would itself be informative). A blunt instrument: *"this filter combination is not available"* regardless of true count.
+- **For distinctness leaks:** k-min on every bucket of `topk` results, or simply returning fewer items.
+
+**Why it matters even if reconstruction is "infeasible".** Membership inference is much cheaper than reconstruction. An attacker who knows the data exists in your system, and who has a list of candidates, only needs to test each candidate. This is realistic for genuinely adversarial users.
+
+**Reference.** Carlini et al., *Membership Inference Attacks From First Principles* (2022); the broader DP literature is built around defending against this attack class.

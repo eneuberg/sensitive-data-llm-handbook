@@ -1,14 +1,32 @@
 ---
 title: "Training-data extraction"
-description: "Relevant only if the LLM was fine-tuned on the data."
+description: "Recovering individual training examples from a model's weights via clever prompting. Relevant only if the model was fine-tuned on your data."
 sidebar:
   order: 10
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+**What it is.** A class of attacks that recover *individual records from the model's training data* by querying the model. Distinct from everything else in this catalog — it doesn't require the model to be reading data at inference time. The data was baked into the weights during training and can be extracted from them.
 
-Relevant only if the LLM was fine-tuned on the data.
+**How it works.** Carlini et al. (2020) demonstrated that GPT-2 — trained on internet scrapes — would produce verbatim, memorised passages including names, phone numbers, email addresses, and 128-bit UUIDs from its training set, given the right prefix. The attack uses targeted prompting (likely prefixes that would have appeared near the sensitive content) and statistical techniques to identify completions that were memorised rather than generated.
+
+A worrying empirical finding: *larger models are more vulnerable*. Memorisation grows with parameter count. Models that learn faster also memorise faster.
+
+**When this matters for you.**
+
+- **You fine-tuned an LLM on your sensitive data.** Direct exposure. Anything in the training set is potentially recoverable from the deployed model. The model's weights are now sensitive data.
+- **You used your sensitive data as in-context examples (few-shot) in a long-running deployment.** Less direct, but examples in the system prompt can be extracted from any conversation that retrieves them.
+- **You did not fine-tune.** Then this attack class does not apply to your data. (It still applies to any data the *base model provider* trained on, but that's their problem.)
+
+**Where it dies in this architecture.**
+
+The architecture in this handbook assumes the LLM is *not* fine-tuned on your sensitive data — the LLM is a general-purpose reasoner that calls tools to get data at inference time. Under that assumption, training-data extraction is a non-issue for your data.
+
+If you do fine-tune:
+
+- **Deduplicate the training corpus aggressively.** Repeated examples are dramatically more likely to be memorised than singletons.
+- **Apply differential privacy during training.** DP-SGD bounds the influence of any single training example on the final weights.
+- **Prefer retrieval to fine-tuning** for sensitive content. A RAG system (with the data-transformation layer applied) keeps sensitive content out of the weights entirely.
+
+**Reference.** Carlini et al., *Extracting Training Data from Large Language Models* (2020), [arXiv:2012.07805](https://arxiv.org/abs/2012.07805). The foundational paper. The follow-up *Membership Inference Attacks From First Principles* (Carlini et al., 2022) is the canonical citation for the related membership-inference setting.

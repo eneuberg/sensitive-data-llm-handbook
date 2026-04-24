@@ -1,14 +1,33 @@
 ---
 title: "Overview"
-description: "Lookup catalog. Each entry: attack, where it fails in the architecture, real-world incident if known."
+description: "Lookup catalog of attack classes against LLMs over sensitive data. Each entry tells you where the attack would fail in a hardened architecture."
 sidebar:
   order: 1
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+A reference catalog. Each entry follows a consistent shape:
 
-Lookup catalog. Each entry: attack, where it fails in the architecture, real-world incident if known.
+- **What it is** — one paragraph.
+- **How it works** — the concrete mechanism.
+- **Where it dies in this architecture** — the layer or pattern that defeats it (with a link).
+- **Reference** — academic source or notable real-world incident, when applicable.
+
+If you arrive here from an incident, scan the titles in the sidebar; the attack you're looking at almost certainly belongs to one of these families.
+
+## How to use this catalog
+
+- **Designing a system?** Walk this list and ask, for each entry, *"would this attack succeed against my design?"*. Anything you can't answer crisply is a hole.
+- **Investigating an incident?** Find the matching entry, then jump to the linked defence to see what should have stopped it.
+- **Reading a paper or vendor pitch?** Map any "novel attack" claim back to the family it belongs to. Most are variants.
+
+## What's not catalogued here
+
+This is not OWASP. It is the subset of attacks that actually matter for *sensitive-data* systems specifically. Excluded:
+
+- Attacks against the model's *output quality* unrelated to data leakage (hallucination, bias, harmful content). Important — different handbook.
+- Attacks against the LLM provider's infrastructure. Out of scope.
+- Attacks specific to multimodal / vision / audio inputs unless they have a database-relevant exfiltration path.
+
+For the broader landscape, see [OWASP LLM Top 10](https://genai.owasp.org/llm-top-10/), [MITRE ATLAS](https://atlas.mitre.org/), and the [further reading](../appendix/further-reading/) appendix.
