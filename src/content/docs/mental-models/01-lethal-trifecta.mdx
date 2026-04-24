@@ -7,8 +7,44 @@ sidebar:
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
+Coined by Simon Willison, the **lethal trifecta** is the dominant single-frame mental model for whether an LLM-integrated system is extractable.
+
+A system has the trifecta when all three are true:
+
+1. **Access to private data** — the model can read information you don't want released.
+2. **Exposure to untrusted input** — content from sources outside your trust boundary reaches the model. This includes: user prompts in a public-facing tool, web pages a browsing agent fetches, emails an assistant reads, and free-text fields in your own database that were filled in by external parties.
+3. **An exfiltration channel** — anything the model can use to get information back out to an attacker. The model's response itself is one. So is a tool that makes outbound network calls, a markdown image whose URL the renderer will fetch, or a "send email" action.
+
+When all three are present, it is a question of attacker effort, not architecture, before data leaks.
+
+## Why the framing dominates
+
+It dominates because it is the cheapest correct answer to the question *"is this safe?"*. You don't need to understand the model, the protocol, the prompt-injection literature, or the specific attack to evaluate a design — you just check the three legs. If you can identify which leg is missing, the system is dramatically harder to attack. If all three are present, you are debating attacker patience rather than possibility.
+
+This is why "MCP versus tool-calling" is the wrong question. The transport doesn't change the trifecta; the *capability surface* does.
+
+## Applied to the database case
+
+For an AI assistant over a sensitive database:
+
+- **Private data** is unavoidable. That's the entire premise.
+- **Untrusted input** is unavoidable if users type free-form questions, *and is also present even with controlled inputs* if the database itself contains free-text fields populated by external parties (support tickets, comment threads, uploaded documents). Those fields can carry indirect prompt injection straight into your model.
+- **Exfiltration channel** is the leg you can actually break. Most architectural work in this handbook is dedicated to it: aggregate-only tool surfaces, k-min suppression, egress filters, denylists.
+
+That is why the handbook's reference architecture is *structured around what the model can emit*, not what it can be told.
+
+## Corollary: the universal-jailbreak assumption
+
+Assume that any prompt-level mitigation — system instructions, persona framing, "do not reveal", refusal training — will eventually fail. Universal adversarial suffixes (Zou et al., GCG, [arXiv 2307.15043](https://arxiv.org/abs/2307.15043)) demonstrated transferable jailbreaks against every aligned model. New ones surface monthly. Designing as if the model will *eventually* obey the attacker is not pessimism; it's the only design posture that aligns with the empirical record.
+
+If you accept the universal-jailbreak assumption, the trifecta tells you what to do: shorten the exfiltration channel until the model's full cooperation with the attacker doesn't actually leak anything.
+
+<Aside type="tip" title="Mindset">
+"Where in this system is the trifecta complete?" is the first question of every architecture review. If you can't answer it, you're not done designing.
 </Aside>
 
-Private data + untrusted input + exfiltration channel = extractable. Remove any one.
+## See also
+
+- [Direct vs indirect injection](./09-direct-vs-indirect/) — the indirect case is where untrusted input enters in non-obvious ways.
+- [Capability over intent](./04-capability-over-intent/) — the principle that operationalises "remove the exfiltration leg".
+- [Mediated tool surface](../patterns/mediated-tool-surface/) — the highest-leverage way to break the exfiltration leg in a database setting.

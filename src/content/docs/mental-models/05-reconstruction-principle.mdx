@@ -7,8 +7,48 @@ sidebar:
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
+The aggregate looks safe. *"What's the average salary?"* leaks nothing about any individual. *"What's the average salary among employees in zip 10001?"* leaks a little more. *"What's the average salary among employees in zip 10001 hired in March 2024 with title containing 'Manager'?"* — if exactly one person matches, the aggregate is the individual.
+
+This is the simple form of the **reconstruction attack**: filter your aggregate down to a single row, and the aggregate becomes a row read. Every aggregate-only system has to address it, or it is not actually an aggregate-only system.
+
+The deeper form is older and more troubling. Dinur and Nissim showed in 2003[^dn] that any database statistic released with bounded noise can be reconstructed in full from polynomially many queries. The bound is sharp: if the noise on each query is less than √n (in a database of n records), an attacker with O(n log² n) queries can recover an arbitrarily large fraction of the original records. Rate-limiting helps; rate-limiting alone is not a defence.
+
+This is why differential privacy exists as a field. It is the only mathematically principled answer to the reconstruction problem.
+
+## What this means in practice
+
+Two things follow directly:
+
+### 1. K-anonymity suppression is non-negotiable
+
+If your aggregate API returns a value when the underlying group has fewer than *k* members, you have built the singleton-aggregate vulnerability into your system. Set *k* — typically between 5 and 25 depending on data sensitivity — and have the tool implementation return `"suppressed"` rather than the value when the group is too small. This is the [k-anonymity suppression pattern](../patterns/data-transformation/), and it is the cheapest single layer in the architecture.
+
+It also has to be enforced *inside* the tool implementation, not in the prompt. A model instructed "don't return aggregates over fewer than 5 records" will simply do exactly that when phrased convincingly enough. A tool implementation that returns `"suppressed"` will return `"suppressed"`.
+
+### 2. Many narrow queries leak as much as one wide one
+
+This is the part most engineers underestimate. Even with k-min suppression, an attacker who can issue many *legal* queries — each above the k threshold — can compose them to extract individuals. Asking for "average salary by department" 100 times with different filter combinations gives you a system of linear equations over the underlying data. Solve for the individual.
+
+The architectural answer to this is a **privacy budget**: every query a user issues consumes some quantity of "privacy", and when their budget is exhausted the system refuses. Differential privacy gives you a principled way to set the noise added to each answer such that the cumulative information released stays under a chosen bound.
+
+## Composability
+
+A privacy budget only works if it composes correctly. The standard composability theorems of differential privacy say roughly: if you've answered *q* queries each with privacy parameter ε, the cumulative privacy loss is bounded by *q · ε* (sequential composition) or √(q) · ε (advanced composition with delta). This is why DP libraries make you state ε per query and track a running budget per user.
+
+The implication for design: **budgets are tracked per identity, across sessions, not per query**. A budget that resets on a new session, or is per-API-key when API keys are cheap, is no budget at all.
+
+## When does this matter?
+
+For an internal tool with five trusted analysts, the reconstruction attack is theoretical. The audit log catches the behavioural pattern long before the math closes. K-min suppression is enough.
+
+For external researchers, contractor access, or any setting where users are mildly motivated, you need k-min *plus* a privacy budget *plus* anomaly detection on query patterns.
+
+For genuinely adversarial users on genuinely sensitive data — health, financial, legally protected — you need the full differential-privacy stack, and you should be using a battle-tested library (OpenDP, Tumult Analytics, Google's `differential-privacy`) rather than rolling your own noise. See [Differential privacy on aggregates](../patterns/differential-privacy/).
+
+<Aside type="tip" title="Mindset">
+"How many narrow questions would it take to reconstruct what you're trying to protect?" If the answer is bounded — if there exists an N — your system needs more than rate limits. It needs k-min, a budget, or DP.
 </Aside>
 
-Enough narrow queries reconstruct any dataset. Foundational result behind differential privacy.
+## References
+
+[^dn]: Dinur, I., & Nissim, K. (2003). *Revealing information while preserving privacy*. Proceedings of the 22nd ACM SIGMOD-SIGACT-SIGART Symposium on Principles of Database Systems (PODS '03), 202–210. The foundational reconstruction result; widely credited as the paper that motivated the formal study of differential privacy.

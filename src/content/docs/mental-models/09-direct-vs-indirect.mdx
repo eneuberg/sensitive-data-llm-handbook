@@ -1,14 +1,61 @@
 ---
 title: "Direct vs indirect injection"
-description: "Direct: attacker is the user. Indirect: attacker poisons data the model later reads. Indirect is harder to spot and harder to defend."
+description: "Direct: attacker is the user. Indirect: attacker poisons data the model later reads."
 sidebar:
   order: 10
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
+A **direct prompt injection** comes from the user's input box. The attacker is, more or less by definition, the user. Defences are easier because the attack is in the foreground: you can audit the user's session, the input is right there in the request, and the user has accepted some kind of authentication that ties them to the attempt.
+
+An **indirect prompt injection** is in data the model reads on the user's behalf — a web page the agent fetches, an email it summarises, a document retrieved by RAG, a free-text field in a database row. The attacker is not the user; the attacker is whoever poisoned the data, possibly months ago. The user is innocent. The model sees the attacker's instructions in the same prompt as the user's instructions, and — see [control plane vs data plane](./02-control-data-plane/) — has no structural way to tell which is which.
+
+The framing is from Greshake et al., 2023[^gr]. It is the more important of the two cases.
+
+## Why indirect attacks are harder
+
+Three reasons:
+
+1. **The attack surface is your data.** You don't control whether someone added a poisoned row to your customer-feedback table six months ago. You don't control the contents of pages a browsing agent might fetch. You inherit the trust posture of every input source, transitively.
+2. **The user has no signal.** A user who sees the model do something weird in response to their own prompt may suspect a problem. A user who sees the model do something weird in response to a *retrieved document* will often blame the model, the system, or themselves — not an attacker who is invisible to them.
+3. **Logging shows nothing actionable.** The malicious input is in *legitimate* data. You'll see the agent's behaviour change, but the cause is buried in a row that looked like every other row.
+
+This is why agentic systems with retrieval are fundamentally harder than chatbots. A chatbot has only the direct-injection surface. An agent that reads your data has the entire history of every external party who could ever write to that data.
+
+## What this implies for your design
+
+Two operating principles:
+
+### Treat any field that could be externally written as untrusted instructions
+
+If the data flowing into the model could ever have been authored by someone outside your trust boundary, it is potentially an injection vector. This is broader than it sounds. Customer support tickets. Comment threads. User profile bios. Uploaded PDFs. Email subject lines. The "company description" field on a CRM record. All of these are control-plane content, structurally.
+
+The defence is in the [data transformation layer](../patterns/data-transformation/) and [spotlighting](../patterns/spotlighting/) — strip, escape, mark, or generalise these fields before they enter the prompt. If you can avoid showing the raw text to the model entirely, do.
+
+### Capability constraints become more important, not less
+
+Direct injection requires the attacker to be present. Indirect injection can happen without anyone being present at the moment of attack — the poisoned content sits in the data, waiting for a user to ask the question that triggers retrieval. There is no rate-limiting cap on attempts because the attempts are decoupled from the attack.
+
+This makes the [capability-over-intent](./04-capability-over-intent/) principle more critical, not less. Direct attacks can be slowed by user-friction layers; indirect attacks can't be. The only durable defence is what the model actually can and cannot do.
+
+## A useful taxonomy of indirect-injection vectors
+
+| Vector | Where the attacker writes | What the user does |
+|---|---|---|
+| Retrieved web pages | Anywhere on the web | Asks an agent to "look this up" |
+| Retrieved emails | Sends an email to the user | Asks an assistant to summarise inbox |
+| RAG corpus poisoning | Anywhere in the indexed source | Asks any question that retrieves that doc |
+| Database row poisoning | Free-text field in your DB | Asks any question that filters/joins to that row |
+| Tool description (MCP) | Contributes a third-party MCP server | Installs the server |
+| Filename / path content | Names a file maliciously | Asks an agent to "process this folder" |
+
+Every row in this table is a real, documented attack class. See [Indirect prompt injection](../threats/indirect-injection/) and [MCP-specific risks](../threats/mcp-specific/) for catalogued instances.
+
+<Aside type="tip" title="Mindset">
+The user is not your only adversary. Every party who has ever written to your data is also your adversary, retroactively, for any future agent that reads it.
 </Aside>
 
-Direct: attacker is the user. Indirect: attacker poisons data the model later reads. Indirect is harder to spot and harder to defend.
+## References
+
+[^gr]: Greshake, K., et al. (2023). *Not what you've signed up for: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection*. AISec Workshop. [arXiv:2302.12173](https://arxiv.org/abs/2302.12173). The paper that named the indirect case and demonstrated it against then-deployed systems including Bing's GPT-4 chat.

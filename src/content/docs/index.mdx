@@ -5,10 +5,49 @@ sidebar:
   order: 1
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
+How do you let an LLM talk to a sensitive database without leaking it? Most of the writing on this question is either marketing ("our platform is secure") or a single-issue rant about prompt injection. Neither helps the engineer who has to ship something next week.
+
+This handbook is a reference. It names the mental models that make LLM-data security tractable, catalogues the attacks worth knowing, lays out an architecture you can copy, and tells you which controls to use under which conditions.
+
+<Aside type="danger" title="The one rule, if you only read one thing">
+**The lethal trifecta.** Any system that combines (1) access to private data, (2) exposure to untrusted input, and (3) an exfiltration channel back to an attacker is extractable. Remove any one of the three and the risk drops by an order of magnitude. Almost every real defense in this handbook is a way of breaking one of these three legs.
 </Aside>
 
-A reference handbook for building AI interfaces over sensitive data.
+## Find what you need
+
+<CardGrid>
+  <LinkCard
+    title="I'm designing this — where do I start?"
+    href="./architecture/00-trust-boundaries/"
+    description="Start at the trust boundary, walk through the request and attack paths, then read the layer reference."
+  />
+  <LinkCard
+    title="I'm reviewing a colleague's design — what's wrong?"
+    href="./mental-models/01-lethal-trifecta/"
+    description="Apply the trifecta and the capability-over-intent test. The anti-patterns page is your other go-to."
+  />
+  <LinkCard
+    title="We just had an incident — what attack class was that?"
+    href="./threats/00-overview/"
+    description="Threat catalog, organised by attack family. Each entry tells you where it would have failed in a hardened architecture."
+  />
+  <LinkCard
+    title="I'm implementing a layer — show me code"
+    href="./implementation/00-overview/"
+    description="Tool-surface design, DB-side concerns, egress filter, testing. Code samples, not prose."
+  />
+</CardGrid>
+
+<LinkCard
+  title="Cheat sheet"
+  href="./cheat-sheet/"
+  description="One page: trifecta, trust-boundary diagram, decision matrix, the don'ts. Print it."
+/>
+
+## What this handbook is not
+
+It is not a survey of every LLM-security paper, not a vendor comparison, not a defence of any one architecture. Where research-grade techniques (CaMeL, StruQ, SecAlign) belong on your radar but aren't yet ready for production, they're called out as **Ausblick** — outlook, not playbook.
+
+It also is not a substitute for reading [Simon Willison's blog](https://simonwillison.net/), the [MCP specification](https://modelcontextprotocol.io), or the [OWASP LLM Top 10](https://genai.owasp.org/llm-top-10/). It does intend to be the document you reach for first when one of those isn't sufficient on its own.

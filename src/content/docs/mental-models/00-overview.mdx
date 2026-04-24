@@ -1,14 +1,29 @@
 ---
 title: "Overview"
-description: "Portable abstractions you can carry into any project."
+description: "Six portable abstractions for reasoning about LLM-data security."
 sidebar:
   order: 1
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
+The mental models in this section are the load-bearing abstractions of the rest of the handbook. They are *portable*: each one is useful in any project where an LLM touches data you'd rather it not extract, regardless of which model, which framework, which transport.
+
+The six models, in the order they're useful when designing a system:
+
+1. **[The lethal trifecta](./01-lethal-trifecta/)** — the single dominant framing for whether a system is extractable.
+2. **[Control plane vs data plane](./02-control-data-plane/)** — why telling the model "don't do X" is structurally fragile.
+3. **[The confused deputy](./03-confused-deputy/)** — the 1988 security pattern every tool-using LLM instantiates.
+4. **[Capability over intent](./04-capability-over-intent/)** — the principle that determines where the security boundary actually lives.
+5. **[The reconstruction principle](./05-reconstruction-principle/)** — why narrow queries leak datasets, and why aggregates need budgets.
+6. **[Direct vs indirect injection](./09-direct-vs-indirect/)** — the distinction that explains why agentic systems are harder to defend than chatbots.
+
+<Aside type="tip" title="If you only learn one">
+Learn the lethal trifecta. It is the conversation-ender for "is this design safe?" — once you can name which leg of the trifecta a control breaks, every other discussion gets shorter.
 </Aside>
 
-Portable abstractions you can carry into any project.
+These six aren't an exhaustive taxonomy of LLM security. They're the subset that *recurs in arguments about sensitive data*. A few honourable mentions that don't get their own page but are worth a sentence:
+
+- **Defence in depth is not a substitute for a load-bearing control.** Six weak layers do not equal one strong one.
+- **You will not out-engineer the universal jailbreak.** Assume any prompt-level mitigation will eventually fail. (This is folded into the lethal-trifecta page as the *universal-jailbreak assumption*.)
+- **The tool surface is the API.** Treat its design with the same rigour as you would a public REST API. Every tool is permanent attack surface.

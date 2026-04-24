@@ -1,14 +1,38 @@
 ---
 title: "The confused deputy"
-description: "A 1988 security principle: an authorized agent tricked into using its authority for an attacker. Every tool-using LLM is one."
+description: "A 1988 security pattern: a privileged agent tricked into using its authority for an attacker. Every tool-using LLM is one."
 sidebar:
   order: 4
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
+The **confused deputy** problem was named by Norm Hardy in a 1988 paper.[^hardy] The setup: a Fortran compiler runs as its own privileged user and writes a billing/usage log to a system file (`SYSX/STAT`). It accepts a user-supplied filename for its output. A user invokes the compiler with `SYSX/BILL` (the system billing file) as the output target. The compiler — running with *its own* authority, not the user's — happily overwrites the billing file. The user could not have written to that file directly. The compiler could. The compiler did not check whether *the user* should have been allowed to ask it to.
+
+The compiler was confused about whose authority it was acting on. It was a *deputy* for the user, but with privileges of its own.
+
+## Why this is exactly an LLM agent
+
+An LLM agent is a deputy. It runs with whatever authority you grant it: read access to your database, send-email permissions, the ability to call other tools, often credentials that are broader than any individual user's. An attacker — directly via prompt injection, or indirectly by poisoning data the agent reads — can ask the agent to use that authority for the attacker's goals. The agent, like the compiler, has no native ability to distinguish *whose* request it is honouring.
+
+Every prompt-injection-leads-to-data-exfiltration story in the literature is a confused-deputy attack. The attacker doesn't need to break the model's authentication, doesn't need to authenticate at all. They only need to get text in front of an authorised deputy and have it interpret that text as an instruction.
+
+## What the framing tells you to do
+
+The confused-deputy literature has a canonical set of mitigations, all of which transfer directly:
+
+- **Capability-based security.** Don't grant the deputy ambient authority. Grant it specific, unforgeable tokens (capabilities) for specific operations. The deputy can only do what its capabilities allow, and if a capability isn't passed, the operation is impossible. The CaMeL paper applies exactly this idea to LLM agents — see [Ausblick: model-level defences](../patterns/model-level-defenses/).
+- **Least privilege.** The deputy should hold the smallest set of permissions that lets it do its job. The smaller the deputy's authority, the smaller the blow when it gets confused.
+- **Authority intersection.** The deputy's effective authority on any operation should be the *intersection* of its own and the requester's. The compiler should only be able to overwrite files the *invoking user* could overwrite.
+
+For an LLM agent, this means: the database role the agent uses should not be more powerful than the user it's serving. If the user couldn't run `SELECT *` themselves, the agent should not be able to either, regardless of which user prompt or document instruction it is currently following.
+
+## The dual to "the model is the security boundary"
+
+If you read [Capability over intent](./04-capability-over-intent/) next, the connection is direct: the confused-deputy framing tells you *why* intent doesn't matter (the deputy doesn't have the right concept of "whose intent"), and capability-over-intent tells you *what to do about it* (constrain what the deputy can do, not what it tries to do).
+
+<Aside type="tip" title="Mindset">
+Every LLM agent is a deputy with its own credentials. Every prompt that reaches it is a request — and it can no more verify *whose* request it is than the 1988 compiler could.
 </Aside>
 
-A 1988 security principle: an authorized agent tricked into using its authority for an attacker. Every tool-using LLM is one.
+[^hardy]: Hardy, N. (1988). *The Confused Deputy (or why capabilities might have been invented)*. ACM SIGOPS Operating Systems Review 22(4). The original two-page note is short, clear, and worth reading once if only to see how directly its 1988 conclusions apply to 2026 LLM agents.

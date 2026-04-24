@@ -7,8 +7,35 @@ sidebar:
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+This is a reference, not a textbook. Three ways to use it, in increasing order of commitment:
 
-Three reading paths: skim mental models, look up a threat, follow the implementation playbook.
+## 1. Skim the mental models (≈ 20 minutes)
+
+Read [Part 1 — Mental Models](./mental-models/00-overview/). Six pages. After you've read them, every other page in this handbook makes sense, and every LLM-security argument you'll see in a meeting is decomposable into a combination of three or four of these models. This is the highest-leverage hour you'll spend.
+
+## 2. Look up an attack or a defence
+
+If you're investigating something specific:
+
+- **An incident or attack class** → [Part 2 — Threat Catalog](./threats/00-overview/). Organised by family. Each entry includes where it would die in a hardened architecture.
+- **A control you want to add** → [Part 4 — Patterns](./patterns/00-overview/). Each pattern has a "when to use this" block at the top.
+- **A what-to-build-when question** → [Part 5 — Decision Matrix](./decisions/matrix/).
+
+## 3. Build the thing
+
+Working through an implementation:
+
+1. Read [Part 3 — Architecture](./architecture/00-trust-boundaries/) end-to-end. ≈ 30 minutes. The two worked examples (request path, attack path) are the spine.
+2. Pick your point on the [Decision Matrix](./decisions/matrix/).
+3. Implement, with code references in [Part 6 — Implementation](./implementation/00-overview/).
+4. Sanity-check against the [Anti-patterns](./patterns/anti-patterns/) page before shipping.
+
+## Conventions
+
+- **"Ausblick"** marks research-grade ideas worth knowing but not yet production-ready. They give you vocabulary to follow the field; they're not on the critical path for shipping.
+- **MCP-specific risks** are called out wherever they apply. MCP is a transport, not a security model — the handbook treats protocol questions and policy questions separately.
+- **Internal cross-links** (e.g. *see [Mediated tool surface](./patterns/mediated-tool-surface/)*) appear inline. Every threat links to its defences, every pattern links to the threats it addresses.
+
+<Aside type="tip">
+If a section feels too short, that's intentional. The point of a reference is that you can find what you need quickly and trust that it isn't padded.
+</Aside>

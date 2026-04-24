@@ -1,14 +1,71 @@
 ---
 title: "Cheat sheet"
-description: "One-page tear-off: lethal trifecta, trust-boundary diagram, decision matrix, the don’ts."
+description: "One page: lethal trifecta, trust-boundary diagram, decision matrix, the don'ts."
 sidebar:
   order: 3
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+One page. Print it.
 
-One-page tear-off: lethal trifecta, trust-boundary diagram, decision matrix, the don’ts.
+## The lethal trifecta
+
+A system is extractable if it combines all three:
+
+1. **Access to private data**
+2. **Exposure to untrusted input**
+3. **An exfiltration channel** back to an attacker
+
+Remove any one. Risk drops by an order of magnitude.
+
+## The one architectural truth
+
+> The tool surface is the security boundary. The system prompt is not.
+
+Anything you let the model invoke, it can be tricked into invoking. Anything outside the tool surface is unreachable, regardless of what the prompt says.
+
+## The six-layer defence
+
+```
+USER  ─────────────────────────────────── (chat UI)
+HOST APPLICATION  ─────────────────────── (LLM + tool dispatcher)
+─── trust boundary ────────────────────────────────────
+LAYER 1  Mediation API     (aggregate-only tools)
+LAYER 2  Aggregation       (k-min suppression, max cardinality, DP)
+LAYER 3  Pre-LLM transform (pseudonymisation, generalisation)
+LAYER 4  DB role           (least privilege, sanitised views only)
+LAYER 5  Egress check      (denylist, density, quoted-substring)
+LAYER 6  Audit + rate-limit
+```
+
+Layers 1 and 4 are load-bearing. The rest are defence in depth.
+
+## Decision matrix (abbreviated)
+
+| | Trusted users | Semi-trusted | Adversarial |
+|---|---|---|---|
+| **Low sensitivity** | Layer 1 + 6 | + Layer 5 | + Spotlighting |
+| **Sensitive** | + Layers 2, 3, 5 | + Layer 3 generalisation + DP | + synthetic-data layer |
+| **Highly sensitive** | + DP | + model-level defences | LLM never sees real data |
+
+Full matrix on the [Decision Matrix](./decisions/matrix/) page.
+
+## The don'ts
+
+- **Do not** trust the system prompt as a security boundary.
+- **Do not** expose `execute_sql` or any free-form query tool.
+- **Do not** rely on an LLM to validate another LLM's output for security purposes.
+- **Do not** pass user OAuth tokens through the agent to downstream tools.
+- **Do not** assume MCP changes the safety calculus. It changes the deployment calculus.
+- **Do not** add prompt-level mitigations *instead of* architectural controls. Add them *on top*.
+
+## When in doubt
+
+Ask three questions, in this order:
+
+1. Where in this system is the lethal trifecta complete?
+2. What can the model actually do, regardless of what it intends?
+3. If every prompt-level mitigation failed tomorrow, what data would leak?
+
+If you have crisp answers to all three, the architecture is probably sound.

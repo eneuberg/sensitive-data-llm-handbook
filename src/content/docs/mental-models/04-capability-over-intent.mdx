@@ -1,14 +1,62 @@
 ---
 title: "Capability over intent"
-description: "You constrain what the model can do, not what it wants to do. The tool surface is the security boundary, not the system prompt."
+description: "You constrain what the model can do, not what it wants to do. The tool surface is the security boundary."
 sidebar:
   order: 5
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
+You cannot verify a model's intent. You can verify its capabilities. So design the capability surface, not the persona.
+
+This is the principle that operationalises both the [lethal trifecta](./01-lethal-trifecta/) (it tells you which leg to break: the exfiltration channel) and the [confused-deputy framing](./03-confused-deputy/) (it tells you what to do about deputies: constrain their authority). It is the single most consequential design decision in any LLM-data system.
+
+## The principle
+
+> The set of operations a model can perform is determined by the tool implementations, the database role, and the surrounding pipeline — not by what the prompt asks it to do or refuses to do.
+
+Asking the model to "be careful" is not a control. Telling it "do not return raw rows" is not a control. Refusal-trained behaviour is not a control. These reduce probability under benign use; they do nothing reliable under adversarial use.
+
+A control is something an attacker cannot remove by writing different text. A `rejected because no execute_sql tool exists` error from a tool dispatcher is a control. A `suppressed because group size 3 < k=5` return from an aggregation tool is a control. A view that simply does not contain the column the attacker wants is a control.
+
+## Three corollaries
+
+These are useful enough on their own that they get folded in here rather than spread across the handbook.
+
+### The tool surface is the API
+
+Treat the design of your tools with the rigour you would treat designing a public REST API. Every tool is permanent attack surface that does whatever its implementation does, regardless of what its description says. A tool named `safe_query` is exactly as safe as the code under it. Naming is not a control either.
+
+The corollary: **prefer fewer, narrower tools over more, broader ones**. `aggregate(metric, groupby, filters)` with k-min enforcement is one tool. `execute_sql(query)` with a "please don't do bad things" docstring is unbounded attack surface.
+
+### Agent-as-perimeter is an anti-pattern
+
+Granting the agent a user's full identity — pass-through OAuth tokens, "act as the user" patterns — extends the trust boundary to whatever that user can do. Now the trifecta's exfiltration leg includes *every* action the user is authorised for, not just what the agent's tool surface exposes. The agent's blast radius is the user's authority, not the agent's design.
+
+The corollary: **the agent should hold its own narrowly-scoped credentials**, ideally with privileges that are the intersection of the user's authority and the operations the agent's tools actually need.
+
+### LLM-as-judge is QA, not a control
+
+Validating LLM output with another LLM (or the same one in a different role) is useful for *quality* — catching obvious wrongs. It is not useful for *security*. Both LLMs share failure modes: an attack that gets past the first model's alignment will, in expectation, also get past the judge's. You are stacking probabilistic filters with correlated errors.
+
+The corollary: **deterministic checks, written in code, on the LLM's output**. That is what the [egress filter](../patterns/egress-filtering/) is. It is small, fast, has zero shared failure mode with the model, and scales without an inference budget.
+
+## What "capability" means in this handbook
+
+It is the union of:
+
+- The operations exposed in the tool dispatcher.
+- The columns and views accessible to the database role the agent uses.
+- The network destinations the host process can reach.
+- The actions any rendering layer (Markdown, HTML, voice) will perform on the model's output (image fetches, link previews, JS execution).
+
+If it isn't in that union, the model cannot do it, no matter what it tries. If it is in that union, you must assume the model *can* be made to do it.
+
+<Aside type="tip" title="Mindset">
+The right question is never "would the model do that?" It is "could the model do that?" The first is unanswerable. The second is a code review.
 </Aside>
 
-You constrain what the model can do, not what it wants to do. The tool surface is the security boundary, not the system prompt.
+## See also
+
+- [Mediated tool surface](../patterns/mediated-tool-surface/) — the canonical capability constraint for the database case.
+- [Anti-patterns](../patterns/anti-patterns/) — the failure modes of designing for intent instead of capability.
