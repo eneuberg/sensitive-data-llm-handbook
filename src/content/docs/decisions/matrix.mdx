@@ -1,14 +1,46 @@
 ---
 title: "Decision matrix"
-description: "Two axes — data sensitivity × user adversariality. Cells = recommended layer combinations + rough effort."
+description: "Pick your point on two axes — data sensitivity and user adversariality. The cell tells you which layers are required."
 sidebar:
   order: 1
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+Two axes determine the right architecture: how sensitive the data is, and how adversarial the users will be. Find your cell. Build the layers it lists.
 
-Two axes — data sensitivity × user adversariality. Cells = recommended layer combinations + rough effort.
+The matrix cumulates: every cell *includes* the layers from every weaker cell to its left and above it.
+
+| | **Trusted users** (small named team, monitored) | **Semi-trusted** (broad employee base, contractors, external researchers) | **Adversarial** (public, unauthenticated, or known motivated) |
+|---|---|---|---|
+| **Low sensitivity** (internal analytics, non-PII) | [Mediated tool surface](../patterns/mediated-tool-surface/) + [Audit log](../patterns/audit-anomaly/). ~1 day. *Residual:* misuse caught after the fact. | + [Egress filter](../patterns/egress-filtering/). ~2 days. *Residual:* paraphrase-rate exfiltration. | + [Spotlighting](../patterns/spotlighting/). ~3 days. *Residual:* universal jailbreaks against the base model. |
+| **Sensitive** (PII, customer data, internal financial) | + [Data transformation](../patterns/data-transformation/) (k-anonymity + pseudonymisation). ~1 week. *Residual:* composition attacks across many queries. | + Generalisation of quasi-identifiers + [DP](../patterns/differential-privacy/) on aggregates. ~2–3 weeks. *Residual:* membership inference on suppression signals. | + [Dual-LLM](../patterns/dual-llm/) for any free-text data the model reads + [model-level defences](../patterns/model-level-defenses/) when feasible. ~4–6 weeks. *Residual:* renderer-side exfiltration if not also hardened. |
+| **Highly sensitive** (health, regulated PII, legally protected) | + [DP](../patterns/differential-privacy/) on aggregates + symmetric suppression. ~3 weeks. *Residual:* trust in your own ops. | + Synthetic-data layer for exploratory queries. ~6+ weeks. *Residual:* re-identification via external joins. | LLM never sees real data. Synthetic dataset for exploration; real-data queries gated by human-in-the-loop approval workflow. ~quarters. *Residual:* operational. |
+
+The diagonal you can ship: most teams' first deployment lives in **{Sensitive × Trusted}** or **{Sensitive × Semi-trusted}**. Build the lower-right cells only when reality forces you there.
+
+## How to read the cells
+
+Each cell lists the *layers added* relative to weaker cells. To get the full layer stack for, say, **{Sensitive × Semi-trusted}**, walk left and up: mediated tool surface + audit + egress filter + data transformation + generalisation + DP. That is the build list.
+
+The effort estimates assume Opus 4.7 (or comparable) is helping with implementation, not building from scratch alone. Calendar time, not engineer-days.
+
+## Escalation and de-escalation
+
+**When to escalate** (move down or right): your usage pattern shifts adversarial; auditors or regulators expand scope; a near-miss incident reveals a residual risk you weren't accounting for; the user base broadens beyond who was originally authorised.
+
+**When to de-escalate** (move up or left, carefully): you are over-engineering for the actual threat. Differential privacy on a five-analyst internal tool is rarely worth its complexity cost. Match the architecture to the cell you actually live in, not the cell that sounds most defensible. Over-engineered systems get bypassed (*"this is too restrictive, let me query the DB directly"*) and the bypasses are usually worse than the lighter architecture would have been.
+
+## The rule that crosses every cell
+
+Regardless of where you sit on the matrix, two layers are non-negotiable:
+
+1. **[Mediated tool surface](../patterns/mediated-tool-surface/)** — no `execute_sql`, ever. The LLM composes from a small allow-list of aggregate primitives.
+2. **[Audit log](../patterns/audit-anomaly/)** — every tool call, every response, retained long enough to investigate.
+
+If those two are not present, the cell you think you're in does not matter; the system is in the lower-right by default.
+
+## See also
+
+- [Cheat sheet](../cheat-sheet/) — the matrix in one-page form for printing.
+- [Trust boundaries](../architecture/00-trust-boundaries/) — what the layer numbers refer to.
