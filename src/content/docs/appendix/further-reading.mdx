@@ -1,14 +1,59 @@
 ---
 title: "Further reading by topic"
-description: "Curated, not a dump. ≤6 items per topic."
+description: "Curated, not a dump. ≤ 6 items per topic."
 sidebar:
   order: 4
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+The minimum reading list per area. If you want the full citation list, see [References](./references/).
 
-Curated, not a dump. ≤6 items per topic.
+## Prompt injection — start here
+
+1. Greshake et al., *Not what you've signed up for*, [arXiv:2302.12173](https://arxiv.org/abs/2302.12173) — the foundational indirect-injection paper.
+2. Simon Willison's *Prompt injection* posts on [simonwillison.net](https://simonwillison.net/) — most accessible running coverage.
+3. Hines et al., *Spotlighting*, [arXiv:2403.14720](https://arxiv.org/abs/2403.14720) — first widely-cited prompt-engineering defence with measured impact.
+4. Liu et al., *Automatic and Universal Prompt Injection*, [arXiv:2403.04957](https://arxiv.org/abs/2403.04957) — gradient-based attack generation.
+
+## Capability mediation and agent design
+
+1. Hardy, *The Confused Deputy* (1988) — read once for the framing.
+2. Debenedetti et al., *CaMeL: Defeating Prompt Injections by Design*, [arXiv:2503.18813](https://arxiv.org/abs/2503.18813) — current state of the art for capability-based agent defence.
+3. Willison's writeup of the *Dual-LLM pattern* — the simpler ancestor of CaMeL.
+
+## Differential privacy
+
+1. Dwork & Roth, *The Algorithmic Foundations of Differential Privacy* (2014) — the textbook.
+2. OpenDP documentation at [opendp.org](https://opendp.org) — the most accessible introduction tied to working code.
+3. Tumult Analytics docs at [tmlt.io](https://www.tmlt.io/analytics) — production-oriented framing.
+4. Dinur & Nissim (2003) — read for *why* DP exists at all.
+
+## Reconstruction and re-identification
+
+1. Sweeney, *Simple Demographics Often Identify People Uniquely* (2000) — the empirical motivation for k-anonymity and generalisation.
+2. Carlini et al., *Membership Inference Attacks From First Principles* (2022) — best treatment of the membership-inference setting.
+3. Carlini et al., *Extracting Training Data*, [arXiv:2012.07805](https://arxiv.org/abs/2012.07805) — only relevant if you fine-tune.
+
+## MCP security
+
+1. Microsoft Developer Blog, *Protecting against indirect prompt injection attacks in MCP* (April 2025).
+2. Invariant Labs, *MCP Security Notification: Tool Poisoning Attacks* (April 2025).
+3. Red Hat, *MCP security: the current situation* (Feb 2026).
+4. The Vulnerable MCP Project at [vulnerablemcp.info](https://vulnerablemcp.info).
+5. The MCP specification at [modelcontextprotocol.io](https://modelcontextprotocol.io).
+
+## Standards and frameworks
+
+1. OWASP Top 10 for LLM Applications — [genai.owasp.org/llm-top-10](https://genai.owasp.org/llm-top-10/).
+2. NIST AI 600-1 (Generative AI Profile, 2024).
+3. MITRE ATLAS — [atlas.mitre.org](https://atlas.mitre.org/).
+
+## Benchmarks and evaluation
+
+1. AgentDojo, [arXiv:2406.13352](https://arxiv.org/abs/2406.13352) — first serious benchmark for agent-side prompt injection.
+
+## When you have time for primary research
+
+- The arXiv `cs.CR` and `cs.AI` recent listings — the field moves monthly. The papers cited in this handbook will be partly superseded within a year.
+- Conferences worth tracking: USENIX Security, IEEE S&P, ACM CCS, NDSS, AISec workshop.

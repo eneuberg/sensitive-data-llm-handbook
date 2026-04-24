@@ -1,14 +1,56 @@
 ---
 title: "References"
-description: "Inline-cited from the handbook. Grouped: foundational, defenses, attacks, standards (OWASP LLM Top 10, NIST AI 600-1, MITRE ATLAS), industry writeups."
+description: "Academic and industry sources cited inline throughout the handbook, grouped by category."
 sidebar:
   order: 2
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+Sources cited from the handbook's prose, grouped. arXiv links go to the latest version. For a curated subset organised by topic rather than category, see [Further reading](./further-reading/).
 
-Inline-cited from the handbook. Grouped: foundational, defenses, attacks, standards (OWASP LLM Top 10, NIST AI 600-1, MITRE ATLAS), industry writeups.
+## Foundational security concepts
+
+- Hardy, N. (1988). *The Confused Deputy (or why capabilities might have been invented).* ACM SIGOPS Operating Systems Review 22(4). The original two-page note; the canonical statement of the confused-deputy problem.
+- Dinur, I., & Nissim, K. (2003). *Revealing information while preserving privacy.* PODS '03, 202–210. The reconstruction-attack result that motivated the formal study of differential privacy.
+- Dwork, C., & Roth, A. (2014). *The Algorithmic Foundations of Differential Privacy.* Foundations and Trends in TCS, 9(3–4). The standard reference for DP.
+- Sweeney, L. (2000). *Simple Demographics Often Identify People Uniquely.* Carnegie Mellon University. The empirical result that 87% of US individuals are uniquely identifiable from {zip, birthdate, sex} alone.
+
+## Attacks
+
+- Greshake, K., Abdelnabi, S., Mishra, S., Endres, C., Holz, T., & Fritz, M. (2023). *Not what you've signed up for: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection.* AISec Workshop. [arXiv:2302.12173](https://arxiv.org/abs/2302.12173). Coined the indirect-injection framing.
+- Zou, A., Wang, Z., Carlini, N., Nasr, M., Kolter, J. Z., & Fredrikson, M. (2023). *Universal and Transferable Adversarial Attacks on Aligned Language Models.* [arXiv:2307.15043](https://arxiv.org/abs/2307.15043). The GCG attack; transferable jailbreaks.
+- Carlini, N., Tramèr, F., Wallace, E., Jagielski, M., Herbert-Voss, A., Lee, K., Roberts, A., Brown, T., Song, D., Erlingsson, Ú., Oprea, A., & Raffel, C. (2020). *Extracting Training Data from Large Language Models.* [arXiv:2012.07805](https://arxiv.org/abs/2012.07805).
+- Carlini, N., Chien, S., Nasr, M., Song, S., Terzis, A., & Tramèr, F. (2022). *Membership Inference Attacks From First Principles.* IEEE S&P 2022.
+- Anil, C., et al. (2024). *Many-shot Jailbreaking.* Anthropic.
+- Liu, X., Yu, Z., Zhang, Y., Zhang, N., & Xiao, C. (2024). *Automatic and Universal Prompt Injection Attacks against Large Language Models.* [arXiv:2403.04957](https://arxiv.org/abs/2403.04957).
+
+## Defences
+
+- Hines, K., Lopez, G., Hall, M., Zarfati, F., Zunger, Y., & Kiciman, E. (2024). *Defending Against Indirect Prompt Injection Attacks With Spotlighting.* [arXiv:2403.14720](https://arxiv.org/abs/2403.14720).
+- Chen, S., Piet, J., Sitawarin, C., & Wagner, D. (2024). *StruQ: Defending Against Prompt Injection with Structured Queries.* [arXiv:2402.06363](https://arxiv.org/abs/2402.06363).
+- Chen, S., Zharmagambetov, A., Mahloujifar, S., Chaudhuri, K., Wagner, D., & Guo, C. (2024). *SecAlign: Defending Against Prompt Injection with Preference Optimization.* [arXiv:2410.05451](https://arxiv.org/abs/2410.05451).
+- Chen, S., Zharmagambetov, A., Wagner, D., & Guo, C. (2025). *Meta SecAlign: A Secure Foundation LLM Against Prompt Injection Attacks.* [arXiv:2507.02735](https://arxiv.org/abs/2507.02735). Open-source 8B and 70B models with the defence trained in.
+- Debenedetti, E., Shumailov, I., Fan, T., Hayes, J., Carlini, N., Fabian, D., Kern, C., Shi, C., Terzis, A., & Tramèr, F. (2025). *Defeating Prompt Injections by Design (CaMeL).* [arXiv:2503.18813](https://arxiv.org/abs/2503.18813). Code at `github.com/google-research/camel-prompt-injection`.
+
+## Benchmarks
+
+- Debenedetti, E., Zhang, J., Balunović, M., Beurer-Kellner, L., Fischer, M., & Tramèr, F. (2024). *AgentDojo: A Dynamic Environment to Evaluate Prompt Injection Attacks and Defenses for LLM Agents.* [arXiv:2406.13352](https://arxiv.org/abs/2406.13352).
+
+## Standards and taxonomies
+
+- OWASP. *OWASP Top 10 for LLM Applications* (2025 revision). [genai.owasp.org/llm-top-10](https://genai.owasp.org/llm-top-10/).
+- NIST. *AI 600-1: Artificial Intelligence Risk Management Framework — Generative AI Profile* (2024).
+- MITRE. *ATLAS — Adversarial Threat Landscape for AI Systems.* [atlas.mitre.org](https://atlas.mitre.org/).
+
+## Industry writeups and primary sources
+
+- Willison, S. *Prompt injection.* [simonwillison.net](https://simonwillison.net/) — running coverage from 2022 to present; coined the *lethal trifecta* framing.
+- Microsoft Developer Blog. *Protecting against indirect prompt injection attacks in MCP* (April 2025).
+- Invariant Labs. *MCP Security Notification: Tool Poisoning Attacks* (April 2025).
+- Red Hat. *MCP security: the current situation* (Feb 2026).
+- The Vulnerable MCP Project. [vulnerablemcp.info](https://vulnerablemcp.info) — running database of MCP-specific CVEs.
+- Anthropic. *Model Context Protocol specification.* [modelcontextprotocol.io](https://modelcontextprotocol.io).
+- OpenDP. [opendp.org](https://opendp.org) — Harvard / Microsoft DP library.
+- Tumult Analytics. [tmlt.io/analytics](https://www.tmlt.io/analytics).
+- Google. *differential-privacy library.* [github.com/google/differential-privacy](https://github.com/google/differential-privacy).
