@@ -1,14 +1,64 @@
 ---
 title: "Trust boundaries first"
-description: "One bold dotted line: below = trusted code, above = untrusted (LLM, user, world). Layers are colored by which side they live on."
+description: "The reference architecture, drawn so that the trust boundary is the most visible thing on the page."
 sidebar:
   order: 1
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+The reference architecture for an AI assistant over a sensitive database. Read the diagram before the prose — the position of the dotted line is the architecture's whole point.
 
-One bold dotted line: below = trusted code, above = untrusted (LLM, user, world). Layers are colored by which side they live on.
+```
+╔═══════════════════════════════════════════════════════════════════╗
+║  UNTRUSTED ZONE  (you cannot rely on anything here)               ║
+║                                                                   ║
+║   USER (chat UI)                                                  ║
+║     │                                                             ║
+║     ▼                                                             ║
+║   HOST APPLICATION                                                ║
+║     ┌──────────────────────────┐                                  ║
+║     │ LLM (Claude / GPT / …)   │  ◄─── tool list lives here       ║
+║     │ tool-call dispatcher     │       (in-process OR MCP client) ║
+║     └──────────────────────────┘                                  ║
+║                                                                   ║
+╚═══════════════════════════════════════════════════════════════════╝
+- - - - - - - - - - - - - - - - TRUST BOUNDARY - - - - - - - - - - -
+╔═══════════════════════════════════════════════════════════════════╗
+║  TRUSTED ZONE  (deterministic code you wrote and reviewed)        ║
+║                                                                   ║
+║   LAYER 1  Mediation API        aggregate-only tools              ║
+║   LAYER 2  Aggregation          k-min, max cardinality, DP        ║
+║   LAYER 3  Pre-LLM transform    pseudonymisation, generalisation  ║
+║   LAYER 4  DB role              least privilege, sanitised views  ║
+║                                                                   ║
+║         ▲ all answers flow back up through ▲                      ║
+║                                                                   ║
+║   LAYER 5  Egress check         denylist, density, substring quote║
+║   LAYER 6  Audit + rate-limit                                     ║
+║                                                                   ║
+╚═══════════════════════════════════════════════════════════════════╝
+```
+
+## The boundary is the design
+
+Everything above the dotted line — the user, the LLM, the tool-call dispatcher, every prompt and every response — is **untrusted**. The model can be jailbroken. The user can be malicious. The chat UI can render whatever the model produces. Designing as if any of these will eventually behave adversarially is the only posture that survives contact with reality.
+
+Everything below is **trusted** — deterministic code that you wrote, you can read, and that does exactly what its source says regardless of what any prompt asks. The only way data crosses from trusted to untrusted is through a tool call, and the only way data crosses back is through a return value that has already passed Layers 1–4 on the way out and Layer 5 on the way back to the user.
+
+The single most important sentence in this handbook: **the choice of MCP versus in-process tool calling is a decision entirely within the untrusted zone, above the boundary.** It does not change a single layer below. See [Where MCP fits](./04-where-mcp-fits/).
+
+## Load-bearing vs defence-in-depth
+
+Two of the layers are load-bearing. The other four are defence in depth.
+
+- **Load-bearing: Layer 1 (Mediation API) and Layer 4 (DB role).** If both are correct, almost every attack class fails. If either is wrong, the rest of the stack cannot save you.
+- **Defence in depth: Layers 2, 3, 5, 6.** Each handles a class of failure that gets through despite Layers 1 and 4 being correct (singleton aggregates, identifier leakage in returned values, prompt-induced quoting of raw data, and detection-after-the-fact respectively).
+
+This ordering matters when you have to choose what to build first. Build Layers 1 and 4 before anything else.
+
+## See also
+
+- [The request path](./01-request-path/) — a benign query traced through every layer.
+- [The attack path](./02-attack-path/) — a hostile query traced through the same layers.
+- [Layer-by-layer reference](./03-layer-reference/) — what each layer does, what it doesn't, and how it's commonly broken.

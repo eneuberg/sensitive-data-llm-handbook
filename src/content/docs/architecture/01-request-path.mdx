@@ -1,14 +1,87 @@
 ---
 title: "The request path"
-description: "Worked example: a benign query traced step-by-step through every layer."
+description: "A benign query traced step-by-step through every layer of the reference architecture."
 sidebar:
   order: 2
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+The same scenario runs through this page and the [attack path](./02-attack-path/) — a small hospital with patient records. The user is an analyst.
 
-Worked example: a benign query traced step-by-step through every layer.
+**The query.** *"What's the average age of patients with diabetes?"*
+
+## Step-by-step
+
+### 1. User message → Host application
+
+The chat UI passes the message to the host. The host appends it to the conversation, along with the system prompt and the LLM's available tool list. The LLM sees:
+
+```
+[system]   You are an analyst assistant for St Hypothesis Medical Center.
+           You have these tools: schema_describe, aggregate, distribution, topk.
+[user]     What's the average age of patients with diabetes?
+```
+
+Note what the LLM does *not* see: an `execute_sql` tool (it doesn't exist), the patient table contents (no tool returns rows), the database password, or any pseudonymisation key.
+
+### 2. LLM emits a tool call
+
+The model composes:
+
+```json
+{
+  "tool": "aggregate",
+  "args": { "metric": "avg_age", "filters": { "diagnosis": "diabetes" } }
+}
+```
+
+The tool dispatcher (in-process or MCP client) receives this and routes it to **Layer 1**.
+
+### 3. Layer 1 — Mediation API
+
+Validates the tool call against its schema. `metric` is in the allow-list; `filters.diagnosis` is a permitted column. The call passes through to **Layer 2**.
+
+What this layer just prevented, by construction: any tool call the model invented that isn't on its surface. There is no `execute_sql`, so the model cannot ask for one.
+
+### 4. Layer 2 — Aggregation enforcement
+
+Computes the underlying group: 47 patients with `diagnosis = 'diabetes'`. 47 ≥ k=5, so the suppression rule does not fire. (If only 3 patients matched, this layer would return `{ "value": "suppressed", "reason": "group size 3 < k=5" }` and the path would terminate here.)
+
+It then asks **Layer 4** for the actual values.
+
+### 5. Layer 3 — Pre-LLM transformation (no-op for this query)
+
+This layer would substitute pseudonyms or generalise quasi-identifiers. For an aggregate that returns a single number, there's nothing to transform. The layer's contribution to this query is zero, and that's fine — defence in depth means each layer earns its keep on a *different* attack.
+
+### 6. Layer 4 — DB role
+
+Issues `SELECT AVG(age) FROM patients_view WHERE diagnosis = 'diabetes'`. The DB role used here cannot `SELECT *`, cannot read raw `patients`, cannot see direct identifiers — it has access only to the sanitised `patients_view`. It returns `58.3`.
+
+### 7. Result returns to the LLM
+
+The LLM receives `{ "value": 58.3, "n": 47 }` as the tool result. It composes a natural-language reply:
+
+```
+The average age of patients with diabetes is approximately 58 (n=47).
+```
+
+### 8. Layer 5 — Egress check
+
+Scans the model's reply: no PII patterns, no entries from the denylist, numeric density is 1 (one number in a one-number answer — sane for the question), no quoted substrings from the underlying rows. Pass.
+
+### 9. Layer 6 — Audit + rate-limit
+
+Logs: `{ user, timestamp, tool: "aggregate", args, result, response, budget_consumed: 0.01 }`. The user's per-session budget is decremented.
+
+### 10. Reply to the user
+
+The chat UI shows the model's answer. Total layers traversed: 6. Total time: a few hundred milliseconds.
+
+## What this teaches
+
+Each layer earns its keep on a different attack class. None of them slowed the legitimate query. The mediation API made the right call possible; aggregation enforcement was a no-op because the request was wide; the DB role was a no-op because the tool implementation already constrained the query; the egress check was a no-op because the answer was clean.
+
+This is the desired property of defence in depth: under benign use, almost every layer is silent.
+
+Compare with [the attack path](./02-attack-path/), where the same layers fire actively and stop the request.

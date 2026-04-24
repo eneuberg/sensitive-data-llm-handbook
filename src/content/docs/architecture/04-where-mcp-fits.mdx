@@ -1,14 +1,53 @@
 ---
 title: "Where MCP fits"
-description: "MCP is a transport choice that lives entirely above the dotted line. It changes nothing below."
+description: "MCP is a transport choice that lives entirely above the trust boundary. It changes nothing below."
 sidebar:
   order: 5
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+The Model Context Protocol (MCP) is the most-asked-about question in any sensitive-data conversation right now. The honest answer is also the deflating one: **the MCP-versus-in-process decision is entirely above the trust boundary, and it does not change a single one of Layers 1–6.**
 
-MCP is a transport choice that lives entirely above the dotted line. It changes nothing below.
+## What MCP is, in one sentence
+
+MCP is a standard for hosting tool implementations in a separate process and letting any compatible host (Claude Desktop, Cursor, a custom app) talk to them over JSON-RPC. From the model's perspective, nothing about the prompt or the tool-call format changes; it sees the same tool list and emits the same structured calls it would in any tool-calling setup.
+
+Architecturally, this slots in here:
+
+```
+HOST APPLICATION
+  ┌─────────────────────────┐
+  │ LLM                     │
+  │ MCP client / dispatcher │ ─── JSON-RPC over stdio/HTTP ───►  MCP SERVER
+  └─────────────────────────┘                                    (your tool impls)
+- - - - - - - - - - - - - - - - TRUST BOUNDARY - - - - - - - - - - - - - - - -
+                                                                LAYERS 1–6 below
+```
+
+The trust boundary is *inside the MCP server* (or inside the in-process tool implementation, in the non-MCP case). MCP just changes whether the implementations live in the same process or a different one.
+
+## What MCP buys you
+
+- **Reusability.** One mediation server can be shared across multiple host applications.
+- **Process isolation.** A buggy or compromised tool implementation crashes its own process, not the host.
+- **Ecosystem.** Pre-built servers exist for common services.
+
+## What MCP does *not* buy you
+
+- **Safety.** A server can do anything its tools are coded to do. A malicious or sloppy MCP server is more dangerous than a careful in-process implementation, because the tool definitions arrive *from outside your codebase* and can change at runtime.
+
+The MCP-specific risks worth naming are: **tool poisoning** (third-party server descriptions carry hidden instructions), **rug pulls** (descriptions silently change after user approval), **cross-server shadowing** (one server's descriptions affect how the model uses another server's tools), and the auth/token concerns that come with remote servers. All of these live entirely in the untrusted zone above the boundary; they are documented in [MCP-specific risks](../threats/mcp-specific/).
+
+## When to choose MCP, when not to
+
+For an internal tool over a sensitive database that you write yourself:
+
+- **Multiple AI surfaces** that would call the same tools (Claude Desktop, a web UI, a chatbot)? **Use MCP.** It saves you from writing the integration N times.
+- **Single host application** you control end-to-end? **Use in-process tool calling.** It removes a process boundary and a class of attack surface (transport auth, IPC bugs).
+
+In neither case does the choice change Layers 1–6. The work is the same. The mediation API still has to exist. K-min suppression still has to be in the tool implementation. The DB role still has to be least-privilege. The egress filter still has to run. The audit log still has to be written.
+
+<Aside type="tip">
+The most common bad framing in MCP-versus-tool-calling debates is *"is one safer than the other?"* The right framing is *"is one a better fit for our deployment?"* Safety is decided below the trust boundary; deployment is decided above it. They are different conversations.
+</Aside>
