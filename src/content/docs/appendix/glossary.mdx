@@ -1,14 +1,88 @@
 ---
 title: "Glossary"
-description: "MCP, RAG, tool calling, k-anonymity, differential privacy, ε-budget, lethal trifecta, control plane / data plane, confused deputy."
+description: "Terms used throughout the handbook, alphabetical."
 sidebar:
   order: 1
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Stub">
-This section is a placeholder. Prose forthcoming.
-</Aside>
+Brief definitions of the terms used in this handbook. Cross-links go to the page where the concept is treated in depth.
 
-MCP, RAG, tool calling, k-anonymity, differential privacy, ε-budget, lethal trifecta, control plane / data plane, confused deputy.
+**Agent-as-perimeter.** Anti-pattern in which an LLM agent is granted a user's full identity (e.g. via OAuth pass-through), making the agent's blast radius equal to the user's authority. See [Capability over intent](../../mental-models/04-capability-over-intent/).
+
+**Aggregate-only tool surface.** A tool surface that exposes only aggregations (count, sum, avg, distribution, topk) and no row-level reads. The single highest-leverage architectural decision in this handbook.
+
+**Audit log.** Per-tool-call record of user, arguments, result, response, and budget consumed. Cheap to implement, load-bearing for incident response.
+
+**CaMeL.** *Capabilities for Machine Learning.* A 2025 system (Debenedetti et al., DeepMind) that wraps an LLM agent with a capability-based interpreter to make untrusted-data influence on control flow provably impossible. See [Model-level defences](../../patterns/model-level-defenses/).
+
+**Capability.** What the model can actually do, regardless of what it tries to do. The capability surface is the union of allowed tool calls, accessible DB views, reachable network destinations, and renderer actions.
+
+**Composability (of privacy loss).** The fact that privacy losses from successive queries accumulate. A budget that doesn't compose across queries (or sessions, or API keys) is no budget at all.
+
+**Confused deputy.** A 1988 security pattern (Hardy): an authorised agent tricked into using its authority for an attacker. Every tool-using LLM is one.
+
+**Control plane / data plane.** Networking distinction: control plane carries instructions, data plane carries payload. In LLMs, both ride the same channel; most attacks exploit the failure to re-separate them.
+
+**Cross-server shadowing.** MCP-specific risk: a malicious server's tool descriptions can change how the model uses *another* server's tools.
+
+**Differential privacy (DP).** Mathematical framework for releasing statistics such that the presence or absence of any single record cannot be reliably inferred. The only mathematical answer to reconstruction at scale.
+
+**Direct prompt injection.** Injection where the attacker is the user typing the prompt. Distinct from indirect injection.
+
+**Dual-LLM pattern.** Architecture in which a privileged LLM (with tools) never sees untrusted content, and a quarantined LLM (with no tools) handles untrusted content and returns symbolic handles.
+
+**Egress filter.** Deterministic post-processing on the LLM's outgoing response: denylist, numeric/character density, quoted-substring length.
+
+**ε-budget (epsilon budget).** Per-user privacy budget in differential privacy. Each query consumes some ε; when exhausted, the session refuses further queries.
+
+**Generalisation.** Quasi-identifier transformation: zip → zip3, age → decade, exact dates → month. Reduces re-identification risk at the cost of fidelity.
+
+**Indirect prompt injection.** Injection where the attacker poisons data the model later reads (a document, an email, a DB row). The user is innocent.
+
+**Jailbreak.** Any attack that gets the model to produce behaviour its alignment training would normally suppress. Includes encoding tricks, role-play, many-shot, and adversarial-suffix attacks.
+
+**k-anonymity / k-min suppression.** Aggregation primitive: aggregates over a group smaller than *k* return `"suppressed"` instead of the value. Standard *k* = 5–25.
+
+**l-diversity.** Refinement of k-anonymity that additionally requires diversity of sensitive values within each k-anonymous group.
+
+**Least privilege.** Principle: an agent (or DB role, or service) holds the smallest privilege set that lets it do its job.
+
+**Lethal trifecta.** Simon Willison's framing: a system is extractable if it combines (1) access to private data, (2) exposure to untrusted input, (3) an exfiltration channel. Remove any one.
+
+**MCP (Model Context Protocol).** Anthropic's open standard for hosting tool implementations in a separate process and connecting them to compatible hosts via JSON-RPC.
+
+**Mediated tool surface.** See *aggregate-only tool surface*.
+
+**Membership inference.** Attack class: determining whether a *known* record is *in* the dataset, from aggregate behaviour.
+
+**Pseudonymisation.** Replacing direct identifiers (names, IDs) with stable tokens before data reaches the LLM. Done at the database view layer.
+
+**Quasi-identifier.** A column whose *combination* with other columns identifies an individual, even though the column alone does not (zip, age, sex).
+
+**Quarantined LLM (Q-LLM).** In a dual-LLM or CaMeL architecture, the LLM that processes untrusted content but has no tools.
+
+**RAG (Retrieval-Augmented Generation).** Architecture in which user questions trigger a vector-similarity search over a corpus; retrieved passages are injected into the model's context. Pure-read, no tool calls.
+
+**Reconstruction attack.** Class of attacks that recover individual records from aggregate statistics via many narrow queries (Dinur-Nissim 2003).
+
+**Rug pull.** MCP-specific risk: a previously-approved server changes its tool descriptions silently after consent.
+
+**SecAlign.** 2024 defence (Chen et al.): preference optimisation that trains a model to prefer the original instruction over an injected one. *Meta SecAlign* (2025) is the open-source 8B/70B variant.
+
+**Singleton aggregate.** The simple form of the reconstruction attack: filter the aggregate down to one row. Defeated by k-min suppression.
+
+**Spotlighting.** Prompt-engineering technique (Hines et al., Microsoft, 2024) that marks untrusted spans in the prompt — by delimiting, datamarking, or encoding — to help the model distinguish data from instructions. Cheap, partial defence.
+
+**StruQ.** 2024 defence (Chen et al.): trains a model on structured queries that separate prompt and data into two channels via special tokens.
+
+**Synthetic data.** Generated dataset that preserves marginal distributions and correlations of a real dataset but contains no real records. Used for exploratory questions in highly-sensitive contexts.
+
+**Tool calling.** A capability of the model: given a list of tools described in a structured schema, the model can emit a JSON request to call one. The model never executes anything; the host application does.
+
+**Tool poisoning.** MCP-specific risk: a third-party server's tool description contains hidden instructions that become part of the model's prompt.
+
+**Trust boundary.** The line in the architecture between untrusted code (user, LLM, dispatcher) and trusted code (the layered defence below). Crossings happen only via tool calls.
+
+**Universal jailbreak assumption.** Design posture: assume any prompt-level mitigation will eventually fail. Justifies the architectural-controls posture in this handbook.
